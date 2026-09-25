@@ -1,7 +1,8 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const express = require('express');
 const { Pool } = require('pg');
-
+ 
 const app = express();
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -10,19 +11,17 @@ const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
 });
-
-app.get('/', (req, res) => {
-  res.send('Hello Smart CRM');
-});
-
-app.get('/health', async (req, res) => {
+ 
+app.get('/', (req, res) => res.send('Hello Smart CRM'));
+ 
+app.get('/db-check', async (req, res) => {
   try {
-    await pool.query('SELECT 1');
-    res.json({ status: 'ok', db: 'connected' });
+    const result = await pool.query('SELECT NOW() AS server_time');
+    res.json({ status: 'OK', ...result.rows[0] });
   } catch (err) {
-    res.status(500).json({ status: 'error', message: err.message });
+    res.status(500).json({ status: 'ERROR', message: err.message });
   }
 });
-
-const PORT = process.env.APP_PORT || 3000;
-app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+ 
+const port = process.env.APP_PORT || 3000;
+app.listen(port, () => console.log('Server chạy tại http://localhost:' + port));
