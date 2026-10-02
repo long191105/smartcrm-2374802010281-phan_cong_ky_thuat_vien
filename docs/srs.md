@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Sinh viên | *(họ tên – MSSV)* |
+| Sinh viên | *Nguyễn Ngô Ngọc Long - 2374802010281* |
 | Track | SE |
 | Luồng | L4 |
 | Phiên bản | 1.0 – 10/2026 |
