@@ -1,12 +1,9 @@
-<!-- BẢN NHÁP: các "Quyết định" dưới đây là ĐỀ XUẤT. Đọc lại từng mục, đổi SỬA/GIỮ nếu em không đồng ý,
-     điền ngày, rồi xoá dòng chú thích này trước khi commit. -->
-
 # Nhật ký thay đổi thiết kế
 
 Mọi sai lệch so với thiết kế Bài tập 1 đều ghi ở đây, mỗi thay đổi bốn dòng:
 phản hồi · quyết định · lý do · ảnh hưởng. File này được nối tiếp ở BT3.
 
-## Sau phản hồi Bài tập 1 (buổi 8, ngày ..../..../2026)
+## Sau phản hồi Bài tập 1 (buổi 6, ngày 9/10/2026)
 
 Điểm BT1: 6/10 (Đầy đủ 7,5 · Kỹ thuật 4,75 · Nhất quán 5,5 · Trình bày 5,0).
 
