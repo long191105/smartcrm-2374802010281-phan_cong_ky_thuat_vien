@@ -1,0 +1,20 @@
+{
+  "name": "smartcrm-2374802010281-phan_cong_ky_thuat_vien",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Prototype mau track SE - phan cong ky thuat vien (CDTN1, VLU)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "migrate": "node src/db/migrate.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.8",
+    "express": "4.21.2",
+    "pg": "^8.13.1"
+  }
+}

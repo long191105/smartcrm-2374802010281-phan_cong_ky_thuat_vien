@@ -1,0 +1,37 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Script trong thu muc nay chay TU DONG khi volume con trong.
+      # So thu tu 1- va 2- bao dam migrations chay truoc seeds.
+      - ./migrations:/docker-entrypoint-initdb.d/1-migrations:ro
+      - ./seeds:/docker-entrypoint-initdb.d/2-seeds:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    ports:
+      - "${DB_PORT:-5432}:5432"
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      PORT: 8000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      db:
+        # CHO db san sang nhan ket noi, khong chi cho container khoi dong.
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+volumes:
+  db_data:

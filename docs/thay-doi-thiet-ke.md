@@ -10,51 +10,54 @@ khi rà soát được ghi rõ là "Tự phát hiện".
 
 Điểm BT1: 6/10 (Đầy đủ 7,5 · Kỹ thuật 4,75 · Nhất quán 5,5 · Trình bày 5,0).
 
-### TD-01 Chốt một bộ thuật ngữ duy nhất: `issue_category`, `ticket_status_log`, `priority` dạng chữ
+### TD-01 Chốt một bộ thuật ngữ duy nhất theo dataset: `category_name`, `ticket_status_log`, `priority` dạng chữ
 
 - **Phản hồi của GV:** Bảng thuật ngữ trong SRS ghi `issue_group`, `ticket_log`, `priority` lưu số 1–3;
   ERD và DDL lại dùng `issue_category`, `ticket_status_log`, `priority` CAO / TRUNG_BINH / THAP.
-- **Quyết định:** SỬA (theo ERD, DDL và case study).
-- **Lý do:** Case study (bảng thuật ngữ, từ điển dữ liệu) dùng `issue_category` và `ticket_status_log`;
-  QT-04 gắn hạn cam kết với CAO / TRUNG_BINH / THAP. Sửa một chỗ trong SRS rẻ hơn đổi tên ở cả ERD,
-  DDL, mã nguồn và test. Sắp xếp theo mức ưu tiên dùng biểu thức `CASE` ở tầng truy vấn.
+- **Quyết định:** SỬA (theo dataset và mô hình L4 sáu bảng).
+- **Lý do:** Dataset L4 có `issue_categories.csv` và `ticket_status_log.csv`; `tickets_history.csv`
+  lưu `priority` bằng CAO / TRUNG_BINH / THAP. Ánh xạ `category_id` sang `category_name` trên các bảng
+  nghiệp vụ, không tạo bảng tham chiếu riêng; SRS, ERD, DDL, seed, API và test dùng cùng thuật ngữ.
+  Sắp xếp theo mức ưu tiên dùng biểu thức `CASE` ở tầng truy vấn.
 - **Ảnh hưởng:** `docs/srs.md` mục 1.1; `docs/erd.drawio`; `migrations/`; mọi tên biến, mã lỗi và
   test trong `src/` và `tests/` dùng đúng các tên này.
 
-### TD-02 Đủ bảy trạng thái phiếu và định nghĩa "phiếu đang mở"
+### TD-02 Chốt sáu trạng thái nguồn và định nghĩa "phiếu đang mở"
 
-- **Tự phát hiện:** Bảng thuật ngữ chỉ nêu 4 trạng thái (MOI, DA_PHAN_CONG, DANG_XU_LY, HOAN_TAT)
-  trong khi DDL có 7; mục 5.4 tính "phiếu đang mở" chỉ gồm "Đã phân công" và "Đang xử lý".
+- **Tự phát hiện:** `tickets_history.csv` và `gen_dataset.py` định nghĩa sáu trạng thái
+  `MOI`, `DA_PHAN_CONG`, `DANG_XU_LY`, `CHO_LINH_KIEN`, `HOAN_TAT`, `DA_DONG`; SRS chỉ nêu bốn,
+  còn DDL cũ dùng một tập trạng thái khác.
 - **Quyết định:** SỬA.
-- **Lý do:** Kỹ thuật viên vẫn đang giữ phiếu ở CHO_LINH_KIEN nên phải tính vào khối lượng công việc,
-  nếu không ngưỡng 15 phiếu (FR4) bị đếm thiếu.
-- **Ảnh hưởng:** `docs/srs.md` mục 1.1 và 5.4: phiếu đang mở = DA_PHAN_CONG, DANG_XU_LY, CHO_LINH_KIEN;
-  hàm đếm khối lượng ở `TicketRepository` và quy tắc ngưỡng ở `AssignService`.
+- **Lý do:** Giữ đúng trạng thái trong nguồn để nạp được mẫu; `CHO_LINH_KIEN` vẫn là phiếu đang mở,
+  còn `DA_DONG` là trạng thái kết thúc trong lịch sử dữ liệu.
+- **Ảnh hưởng:** `docs/srs.md`, `docs/erd.drawio`, API contract, migration, seed và test dùng đúng sáu
+  trạng thái; phiếu đang mở = `DA_PHAN_CONG`, `DANG_XU_LY`, `CHO_LINH_KIEN`.
 
 ### TD-03 Rút ERD từ 11 xuống 6 bảng
 
 - **Phản hồi của GV:** ERD và DDL có 11 bảng (6 lõi + 5 tham chiếu), vượt mức 4–6; nên rút các bảng
   tham chiếu về mức tối thiểu hoặc gộp lại.
 - **Quyết định:** SỬA (đủ 6 bảng).
-- **Lý do:** Năm bảng `customer`, `device`, `employee`, `service_center`, `issue_category` thuộc L2 hoặc
-  hệ thống người dùng, ngoài phạm vi L4. L4 chỉ cần giá trị để hiển thị và lọc, nên chuyển thành cột:
-  `ticket` thêm `customer_name`, `customer_phone`, `device_serial`, `center_code`; `technician` thêm
-  `full_name`, `center_code`; `issue_category` thành cột VARCHAR có CHECK ở `ticket` và
-  `technician_skill`; `assigned_by`, `created_by`, `changed_by` thành VARCHAR(100) lưu tên người thực
-  hiện. Như vậy QT-08 (cùng trung tâm, tay nghề theo nhóm sự cố) vẫn lọc được bằng cột, và màn hình M2
-  vẫn hiển thị đủ tên khách, số điện thoại, thiết bị. Còn 6 bảng: `ticket`, `technician`,
-  `technician_skill`, `appointment`, `ticket_assignment`, `ticket_status_log`.
-- **Ảnh hưởng:** `docs/erd.drawio` (6 bảng); `docs/srs.md` mục 4.2 và 5.4; `docs/architecture.drawio`
-  (khung "Bảng tham chiếu" bỏ đi); `migrations/001_init.sql`; `seeds/`.
+- **Lý do:** Theo hướng dẫn Track SE, L4 dùng danh mục trung tâm, kỹ thuật viên, tay nghề và nhóm sự cố;
+  `tickets_history.csv` là nguồn phiếu kiểm thử. Để đáp ứng giới hạn 4–6 bảng mà vẫn lọc theo trung tâm
+  và nhóm sự cố, giữ `center_code` và `category_name` trực tiếp ở các bảng nghiệp vụ, không tạo bảng
+  riêng cho trung tâm/nhóm sự cố. `customer_id`, `product_id` và `changed_by` là mã tham chiếu nguồn,
+  không phải khóa ngoại vì hồ sơ khách hàng/sản phẩm/người dùng thuộc luồng khác; không nạp
+  `customers_raw.csv` hay `products.csv` cho L4. `serial_no` là snapshot từ phiếu, không tạo bảng
+  `device` vì dataset xác nhận mã này không liên kết với bảng thiết bị. Sáu bảng là `ticket`,
+  `technician`, `technician_skill`, `appointment`, `ticket_assignment`, `ticket_status_log`.
+- **Ảnh hưởng:** `docs/erd.drawio` (đúng 6 bảng); `docs/srs.md`, API contract, migration, seed và sơ đồ
+  kiến trúc ghi rõ các mã ngoài phạm vi không có FK. Dữ liệu lịch hẹn được sinh riêng; trước khi nạp
+  phải kiểm tra `ticket_id`, `technician_id`, `center_code` và trùng lịch.
 
-### TD-04 Viết lại hai câu lập luận thiếu đánh đổi; sửa mã NFR
+### TD-04 Viết lại các câu lập luận thiếu đánh đổi; sửa mã NFR
 
 - **Phản hồi của GV:** Câu 2 (NFR2) và câu 3 (NFR3) không nêu đánh đổi nên mới có 2 câu đạt khuôn
   (đề yêu cầu ít nhất 3); chú thích chỉ mục ghi NFR5 nhưng SRS chỉ có NFR1–NFR4.
 - **Quyết định:** SỬA.
 - **Lý do:** Mỗi câu phải đủ ba thành phần "Vì NFRx… tôi chọn… đánh đổi là…". Chú thích phải trỏ đúng
   NFR đang tồn tại thì mới truy vết được.
-- **Ảnh hưởng:** `docs/srs.md` mục 3.2 (thay câu 2 và 3 bằng bản ở phụ lục dưới đây);
+- **Ảnh hưởng:** `docs/srs.md` mục 3.3 (ba quyết định đều nêu lựa chọn và đánh đổi);
   `migrations/` (chú thích chỉ mục ghi NFR1 hoặc NFR2); `docs/architecture.drawio` (bỏ "NFR4" gắn với
   kiểm tra `center_id` và "NFR5" gắn với bộ lập lịch, đổi thành NFR4 đúng nghĩa của SRS).
 
@@ -65,20 +68,23 @@ khi rà soát được ghi rõ là "Tự phát hiện".
 - **Lý do:** Chỉ còn 5 buổi cho Giai đoạn 2. US7 (khách xác nhận lịch hẹn, COULD) cần kênh liên lạc với
   khách, ngoài phạm vi prototype. Giữ US1–US6 và US8 (phân công lại, gắn với QT-07); US7 xuống backlog,
   US9 vẫn WON'T.
-- **Ảnh hưởng:** `docs/srs.md` mục 1.3 và bảng truy vết (FR8 ghi "backlog"); `docs/usecase.drawio` (bỏ
-  UC7); `docs/architecture.drawio` (bỏ "Trang xác nhận lịch hẹn"); `docs/wireframe.drawio` (bỏ khối
-  "Xác nhận của khách" ở M2). Cột `appointment.confirmed_at` và trạng thái DA_XAC_NHAN giữ nguyên trong
-  DDL nhưng chưa dùng.
+- **Ảnh hưởng:** `docs/srs.md` và API contract đánh dấu FR8 là backlog; trạng thái `DA_XAC_NHAN`
+  chỉ được giữ nếu xuất hiện ở dữ liệu lịch sử, không mở tính năng cho khách xác nhận trong BT2.
+  `docs/usecase_L4.drawio`
+  (bỏ UC7 khỏi phạm vi hiện thực); `docs/architecture.drawio` (bỏ trang xác nhận lịch khách hàng);
+  `docs/wireframe.drawio` bỏ chức năng này khỏi phạm vi hiện thực. Không lưu cột/trạng thái xác nhận
+  của khách trong mô hình tối thiểu L4.
 
-### TD-06 Thống nhất mã FR / US / UC và chú thích dưới hình wireframe
+### TD-06 Thống nhất mã FR / US / UC và truy vết wireframe
 
 - **Phản hồi của GV:** Chú thích FR dưới Hình 5.2 và 5.3 khác bảng truy vết 5.5.
-  **Tự phát hiện:** mã viết lẫn FR01 và FR1.
-- **Quyết định:** SỬA (lấy bảng truy vết 5.5 làm chuẩn, dùng dạng FR1, US1, UC1).
-- **Lý do:** Mọi mã phải khớp giữa SRS, sơ đồ và wireframe. Theo bảng 5.5: M1 gồm FR1, FR2, FR7;
-  M2 gồm FR1, FR3, FR4, FR5, FR9; M3 gồm FR6.
-- **Ảnh hưởng:** `docs/srs.md` mục 1.3 và 5.5; `docs/usecase.drawio`; chú thích hình trong
-  `docs/wireframe.drawio`; mã quy tắc trong comment của `src/services/`.
+  **Tự phát hiện:** mã viết lẫn FR01 và FR1; UC7 còn xuất hiện ở wireframe dù đã chuyển xuống backlog.
+- **Quyết định:** SỬA; dùng dạng FR1, US1, UC1 và ghi truy vết theo chức năng thực tế của từng màn.
+- **Lý do:** M1 hỗ trợ phân công, khối lượng, gợi ý, cảnh báo và phân công lại; M2 chỉ đặt/kiểm tra
+  lịch; M3 cho kỹ thuật viên xem và cập nhật phiếu. Vì vậy M1 = FR1, FR2, FR4, FR5, FR7, FR9;
+  M2 = FR3; M3 = FR6, FR10.
+- **Ảnh hưởng:** Bảng truy vết màn hình trong `docs/srs.md`; sơ đồ `docs/usecase_L4.drawio`;
+  nhãn UC/FR trong `docs/wireframe.drawio`; mã quy tắc trong comment của `src/services/`.
 
 ### TD-07 Sửa tên bài toán; thêm FR10 cập nhật trạng thái; gọn lại phạm vi mục 1.1
 
@@ -109,17 +115,24 @@ khi rà soát được ghi rõ là "Tự phát hiện".
 - **Ảnh hưởng:** Chạy `git rm -r --cached src/backend/node_modules`; ghi địa chỉ repo đầy đủ ở README;
   trang bìa PDF BT2 ghi link, tên tag v0.2, lớp và ngày nộp.
 
-## Phụ lục: hai câu lập luận đã viết lại (thay cho câu 2 và 3 ở SRS mục 3.2)
+## Sau kiểm tra dataset Mekong Mobile (buổi 8, ngày 19/10/2026)
 
-2. Vì NFR2 yêu cầu kiểm tra trùng lịch ≤ 1 giây với 500 lịch hẹn, tôi chọn đặt ràng buộc `EXCLUDE`
-   (`ex_appointment_no_overlap`) trên `(technician_id, tsrange(start_at, end_at))` với chỉ mục GiST, để
-   phép kiểm tra trùng đi qua chỉ mục thay vì quét toàn bộ lịch của kỹ thuật viên; đánh đổi là phụ thuộc
-   tính năng riêng của PostgreSQL (extension `btree_gist`) và mỗi lần ghi phải cập nhật thêm chỉ mục, nên
-   đổi sang CSDL khác phải viết lại phần chống trùng ở tầng nghiệp vụ. Ngoài ra, `AppointmentService`
-   bắt lỗi `23P01` và trả mã nghiệp vụ `LICH_HEN_TRUNG`, để hai yêu cầu đồng thời không cùng vượt qua
-   bước kiểm tra.
-3. Vì NFR3 yêu cầu 20 quản lý thao tác đồng thời mà không phiếu nào có hai kỹ thuật viên phụ trách, tôi
-   chọn cập nhật phiếu có điều kiện trong một transaction: phân công lần đầu chỉ ghi khi `status = 'MOI'`;
-   phân công lại (US8) chỉ ghi khi `technician_id` vẫn bằng giá trị quản lý đã nhìn thấy; kèm unique
-   index `uq_assignment_current` (QT-07) làm lưới an toàn. Đánh đổi là yêu cầu đến sau bị từ chối (409)
-   nên giao diện phải tải lại dữ liệu, và transaction giữ khoá dòng thêm vài mili giây.
+### TD-10 Chọn nguồn dữ liệu đúng cho Track SE – L4
+
+- **Tự phát hiện:** ZIP dataset có các tệp cho nhiều luồng; không phải toàn bộ tệp Track SE đều thuộc
+  L4, và dữ liệu lịch hẹn không có sẵn trong bộ CSV chính.
+- **Quyết định:** SỬA (dùng đúng các nguồn L4, giữ nguyên mã nguồn khi có thể).
+- **Lý do:** `dataset/README.md` chỉ định cho Track SE các danh mục trung tâm, kỹ thuật viên, tay nghề,
+  nhóm sự cố và phiếu lịch sử. Đối với L4, dùng `service_centers.csv` (6 trung tâm),
+  `technicians.csv` (38 kỹ thuật viên), `technician_skills.csv` (159 kỹ năng),
+  `issue_categories.csv` (6 nhóm), `tickets_history.csv` (7.800 phiếu) và
+  `ticket_status_log.csv` (38.112 lịch sử). Tệp `parts.csv` và `part_stock.csv` thuộc luồng kho linh
+  kiện, không nạp cho L4. `appointments.csv` được sinh bằng `tools/gen_sample.py` với seed cố định;
+  vì generator chọn kỹ thuật viên/trung tâm độc lập với phiếu, dữ liệu phải được kiểm tra/chuẩn hóa
+  trước khi nạp để bảo đảm khóa và quy tắc chống trùng lịch.
+- **Tác động dữ liệu:** `tickets_history.csv` hiện không có phiếu nào ở `MOI`; có 1.162 phiếu đang mở
+  (`DA_PHAN_CONG`, `DANG_XU_LY`, `CHO_LINH_KIEN`) và 6.638 phiếu ở `HOAN_TAT`/`DA_DONG`. Vì vậy phải
+  tạo fixture phân công mới có thể tái lập, không được giả định lịch sử cung cấp sẵn hàng đợi `MOI`.
+- **Ảnh hưởng:** `docs/srs.md`, `docs/erd.drawio`, API contract, migration, seed và README ghi rõ ánh xạ
+  CSV → bảng; không commit các CSV nguồn lớn. Dữ liệu khách hàng thô, đơn hàng, sản phẩm và linh kiện
+  không thuộc phạm vi L4.
