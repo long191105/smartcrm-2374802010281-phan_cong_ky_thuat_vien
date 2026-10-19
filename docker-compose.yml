@@ -1,0 +1,40 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # PostgreSQL initdb only runs files at the root of this directory.
+      - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./migrations/002_tickets.sql:/docker-entrypoint-initdb.d/02-indexes.sql:ro
+      - ./seeds/001_demo.sql:/docker-entrypoint-initdb.d/03-demo.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    ports:
+      - "${DB_PORT:-5432}:5432"
+
+  api:
+    build: .
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      PORT: 8000
+    depends_on:
+      db:
+        # CHO db san sang nhan ket noi, khong chi cho container khoi dong.
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+volumes:
+  db_data:

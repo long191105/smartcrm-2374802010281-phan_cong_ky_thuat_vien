@@ -1,31 +1,40 @@
 # API Contract – Luồng L4 (Track SE)
 
-Phạm vi: các endpoint phục vụ story MUST (US1, US2, US3) và US4 dùng chung endpoint của US2.
+Phạm vi endpoint: US1–US5 đang triển khai theo lát cắt, với US6 và US8 mở rộng sau;
+US7 xác nhận lịch hẹn của khách hàng nằm ngoài prototype và không có endpoint trong BT2.
 
 - Base URL: `/api`
-- Định dạng: JSON, UTF-8. Thời gian theo ISO 8601 có múi giờ (ví dụ `2026-10-05T14:00:00+07:00`).
-- Thuật ngữ theo `srs.md` mục 1.3.
+- Định dạng: JSON, UTF-8. Thời gian nhận/trả theo ISO 8601.
+- Thuật ngữ, mã trạng thái và định dạng ID theo `srs.md` mục 1.3.
+- L4 sử dụng mã nguồn từ dataset: mã phiếu dạng `BH-000001/2025`, mã kỹ thuật viên dạng `KT001`,
+  mã trung tâm dạng `TT01`, nhóm sự cố như `MAN_HINH`. Các ví dụ có mã `BH-900001/2025` là fixture
+  tổng hợp riêng vì dataset hiện không có phiếu `MOI`.
 
-## 1. Mã trạng thái nghiệp vụ
+## 1. Mã trạng thái
 
-| Mã trong API | Hiển thị |
-|---|---|
-| `PENDING_ASSIGNMENT` | Chờ phân công |
-| `ASSIGNED` | Đã phân công |
-| `IN_PROGRESS` | Đang xử lý |
-| `PENDING_CONFIRMATION` | Chờ xác nhận (lịch hẹn) |
-| `CONFIRMED` | Đã xác nhận (lịch hẹn) |
+| Trường | Giá trị | Diễn giải |
+|---|---|---|
+| `ticket.status` | `MOI` | Chờ phân công |
+| `ticket.status` | `DA_PHAN_CONG` | Đã phân công |
+| `ticket.status` | `DANG_XU_LY` | Đang xử lý |
+| `ticket.status` | `CHO_LINH_KIEN` | Chờ linh kiện; vẫn tính là đang mở |
+| `ticket.status` | `HOAN_TAT` | Hoàn tất |
+| `ticket.status` | `DA_DONG` | Đã đóng |
+| `appointment.status` | `DA_DAT`, `DA_XAC_NHAN`, `HOAN_TAT`, `KHACH_HUY`, `KHACH_KHONG_DEN` | Trạng thái theo mẫu lịch hẹn; xác nhận của khách không thuộc chức năng BT2 |
+| `appointment.appointment_type` | `GIAO_MAY`, `NHAN_MAY`, `KIEM_TRA_TAI_CHO` | Loại lịch hẹn trong dataset |
 
-Mã tay nghề: `MAY_GIAT`, `TU_LANH`, `DIEU_HOA`. Mã địa bàn: `Q1`, `Q4`, `Q7`…
+Nhóm sự cố hợp lệ: `MAN_HINH`, `PIN`, `SAC`, `PHAN_MEM`, `NUOC_VAO`, `KHAC`.
+Trung tâm được nhận diện bằng `center_code`, ví dụ `TT01`; trạng thái kỹ thuật viên là `ACTIVE` hoặc
+`INACTIVE`.
 
 ## 2. Danh sách endpoint
 
 | # | Phương thức | Đường dẫn | Mục đích | Truy vết |
 |---|---|---|---|---|
-| E1 | GET | `/api/tickets?status=PENDING_ASSIGNMENT` | Lấy danh sách phiếu chờ phân công | US1 |
-| E2 | POST | `/api/tickets/{ticket_id}/assignment` | Phân công phiếu cho một kỹ thuật viên | US1 |
-| E3 | GET | `/api/technicians?skill=&area=&status=ACTIVE` | Danh sách kỹ thuật viên kèm số phiếu đang mở, lọc theo tay nghề và địa bàn | US2, US4 |
-| E4 | POST | `/api/appointments` | Đặt lịch hẹn giao – nhận máy | US3 |
+| E1 | GET | `/api/tickets?status=MOI&center_code=TT04` | Lấy và lọc phiếu | US1, FR1 |
+| E2 | POST | `/api/tickets/{ticket_code}/assignment` | Phân công một phiếu | US1, FR1, FR4 |
+| E3 | GET | `/api/technicians?category_name=MAN_HINH&center_code=TT04&status=ACTIVE` | Gợi ý kỹ thuật viên và khối lượng | US2, US4; FR2, FR5 |
+| E4 | POST | `/api/appointments` | Đặt lịch cho phiếu đã phân công | US3, FR3 |
 
 ## 3. Định dạng lỗi chung
 
@@ -37,11 +46,90 @@ Mã tay nghề: `MAY_GIAT`, `TU_LANH`, `DIEU_HOA`. Mã địa bàn: `Q1`, `Q4`, 
 }
 ```
 
----
+## E1. GET /api/tickets?status=MOI&center_code=TT04
 
-## E1. GET /api/tickets?status=PENDING_ASSIGNMENT
+Truy vết: US1 – FR1 – UC1. Bộ lọc `status`, `center_code`, `category_name` là tùy chọn; không truyền
+`status` thì trả danh sách theo phân trang.
 
-Truy vết: US1 (luồng chính bước 1, UC1).
+**Response 200 OK**
+
+```json
+{
+  "items": [],
+  "total": 0
+}
+```
+
+`customer_id`, `product_id`, `serial_no` và `due_date` là các giá trị lấy từ phiếu lịch sử; API không
+tra cứu hồ sơ khách hàng hoặc danh mục thiết bị trong L4. Dataset có 0 phiếu `MOI`, nên truy vấn này
+trả rỗng nếu chỉ nạp dữ liệu nguồn; tạo fixture `BH-900001/2025` ở trạng thái `MOI` để kiểm thử UC1.
+
+| Mã | Khi nào |
+|---|---|
+| 200 | Thành công; không có kết quả trả `items: []` |
+| 400 | Mã trạng thái, trung tâm hoặc nhóm sự cố không hợp lệ |
+
+## E2. POST /api/tickets/{ticket_code}/assignment
+
+Truy vết: US1 – FR1, FR4 – UC1. Chỉ phân công phiếu đang ở `MOI`. `assigned_by` là mã người thực hiện
+nguồn dạng chuỗi, không phải khóa ngoại sang hệ thống người dùng.
+Do mã phiếu chứa dấu `/`, client phải URL-encode giá trị path parameter, ví dụ
+`BH-900001%2F2025`.
+
+Fixture `BH-900001/2025` dùng kỹ thuật viên `KT002`, đang có 17 phiếu mở; vì vượt ngưỡng 15, quản lý
+xác nhận tiếp tục phân công.
+
+**Request**
+
+```json
+{
+  "technician_code": "KT002",
+  "assigned_by": "8",
+  "confirm_overload": true
+}
+```
+
+**Response 201 Created**
+
+```json
+{
+  "ticket_code": "BH-900001/2025",
+  "status": "DA_PHAN_CONG",
+  "technician_code": "KT002",
+  "assigned_by": "8",
+  "assigned_at": "2026-10-19T09:30:00+07:00"
+}
+```
+
+**Response 400 Bad Request**
+
+```json
+{
+  "error_code": "VALIDATION_ERROR",
+  "message": "Dữ liệu không hợp lệ.",
+  "details": { "technician_code": "Phải có định dạng KT và 3 chữ số." }
+}
+```
+
+**Response 404 Not Found** nếu không tìm thấy phiếu hoặc kỹ thuật viên.
+
+**Response 409 Conflict** nếu phiếu đã được phân công (bao gồm trường hợp quản lý khác vừa phân công)
+hoặc kỹ thuật viên đạt ngưỡng 15 phiếu đang mở mà `confirm_overload` là `false`.
+
+Việc kiểm tra `MOI` và ghi phân công phải nằm trong cùng một transaction; unique index trên phiếu đang
+có người phụ trách là lớp bảo vệ cuối cùng cho NFR3.
+
+| Trường | Vị trí | Bắt buộc | Kiểu / quy tắc |
+|---|---|---|---|
+| `ticket_code` | path | Có | Mã từ dataset; fixture UC1 dùng `BH-900001/2025` |
+| `technician_code` | body | Có | `KT` + 3 chữ số |
+| `assigned_by` | body | Có | ID nguồn dạng chuỗi |
+| `confirm_overload` | body | Không | boolean, mặc định `false` |
+
+## E3. GET /api/technicians?category_name=MAN_HINH&center_code=TT04&status=ACTIVE
+
+Truy vết: US2, US4 – FR2, FR5 – UC2, UC5. Response minh họa kỹ thuật viên `KT002` trong dataset
+(đang hoạt động tại `TT04`, có tay nghề `MAN_HINH` mức 3); khối lượng đang mở là 17 phiếu.
 
 **Response 200 OK**
 
@@ -49,278 +137,101 @@ Truy vết: US1 (luồng chính bước 1, UC1).
 {
   "items": [
     {
-      "ticket_id": "BH-0231",
-      "customer_name": "Lê Thị Hoa",
-      "device": "Máy giặt LG FV1409S4W",
-      "required_skill": "MAY_GIAT",
-      "area": "Q7",
-      "status": "PENDING_ASSIGNMENT",
-      "due_at": "2026-10-07T17:00:00+07:00"
+      "technician_id": 2,
+      "technician_code": "KT002",
+      "full_name": "Trần Hoài Giang",
+      "center_code": "TT04",
+      "skills": [
+        { "category_name": "MAN_HINH", "proficiency": 3 },
+        { "category_name": "PIN", "proficiency": 5 },
+        { "category_name": "SAC", "proficiency": 3 },
+        { "category_name": "PHAN_MEM", "proficiency": 3 },
+        { "category_name": "KHAC", "proficiency": 2 }
+      ],
+      "is_active": true,
+      "open_tickets": 17,
+      "at_limit": true
     }
   ],
   "total": 1
 }
 ```
 
+Danh sách kỹ thuật viên có thể lọc theo `category_name`, `center_code` và `status`. Nếu lọc
+`status=ACTIVE`, kỹ thuật viên nghỉ không xuất hiện. Một kỹ thuật viên không có phiếu đang mở vẫn
+được trả `open_tickets: 0`.
+
 | Mã | Khi nào |
 |---|---|
-| 200 | Thành công (danh sách rỗng vẫn trả 200) |
-| 400 | `status` không thuộc các giá trị hợp lệ |
+| 200 | Thành công; không có người phù hợp trả `items: []` |
+| 400 | `category_name`, `center_code`, `status` hoặc `limit` không hợp lệ |
 
----
-
-## E2. POST /api/tickets/{ticket_id}/assignment
-
-Truy vết: US1 – FR1, FR4 – UC1.
-
-**Request**
-
-```json
-{
-  "technician_id": "KTV-007",
-  "assigned_by": "QL-001",
-  "confirm_overload": false
-}
-```
-
-**Response 201 Created**
-
-```json
-{
-  "ticket_id": "BH-0231",
-  "status": "ASSIGNED",
-  "technician_id": "KTV-007",
-  "assigned_by": "QL-001",
-  "assigned_at": "2026-10-02T09:30:00+07:00"
-}
-```
-
-**Response 400 Bad Request** (dữ liệu sai)
-
-```json
-{
-  "error_code": "VALIDATION_ERROR",
-  "message": "Dữ liệu không hợp lệ.",
-  "details": { "technician_id": "Phải có định dạng KTV-###" }
-}
-```
-
-**Response 404 Not Found** (không thấy phiếu hoặc kỹ thuật viên)
-
-```json
-{
-  "error_code": "TECHNICIAN_NOT_FOUND",
-  "message": "Không tìm thấy kỹ thuật viên KTV-999.",
-  "details": {}
-}
-```
-
-**Response 409 Conflict – phiếu đã có người phụ trách** (ngoại lệ 6a, tiêu chí US1-AC2)
-
-```json
-{
-  "error_code": "TICKET_ALREADY_ASSIGNED",
-  "message": "Phiếu BH-0231 đã được phân công cho KTV-003.",
-  "details": { "current_technician_id": "KTV-003" }
-}
-```
-
-**Response 409 Conflict – vượt ngưỡng** (ngoại lệ 5a, tiêu chí US1-AC3; gửi lại với `confirm_overload: true` để xác nhận)
-
-```json
-{
-  "error_code": "TECHNICIAN_OVER_LIMIT",
-  "message": "KTV-012 đã có 15 phiếu đang mở (ngưỡng tối đa 15).",
-  "details": { "open_tickets": 15, "limit": 15 }
-}
-```
-
-| Mã | Khi nào | Ngoại lệ liên quan |
+| Trường | Bắt buộc | Kiểu / quy tắc |
 |---|---|---|
-| 201 | Phân công thành công | Luồng chính |
-| 400 | `technician_id` hoặc `assigned_by` sai định dạng, thiếu trường bắt buộc | – |
-| 404 | Không có phiếu hoặc kỹ thuật viên với mã đã cho | – |
-| 409 | `TICKET_ALREADY_ASSIGNED`: phiếu đã có người, hoặc người khác vừa phân công trước | 6a |
-| 409 | `TECHNICIAN_OVER_LIMIT`: kỹ thuật viên đạt ngưỡng và `confirm_overload` là `false` | 5a |
-
-Ghi chú triển khai: việc kiểm tra trạng thái phiếu và ghi phân công phải nằm trong cùng một giao dịch (hoặc dùng khóa lạc quan) để đảm bảo NFR3.
-
-**Bảng validation**
-
-| Trường | Vị trí | Bắt buộc | Kiểu | Độ dài / dải giá trị |
-|---|---|---|---|---|
-| `ticket_id` | path | Có | string | Mẫu `BH-` + 4 chữ số trở lên |
-| `technician_id` | body | Có | string | Mẫu `KTV-###` (3 chữ số) |
-| `assigned_by` | body | Có | string | Mẫu `QL-###` (3 chữ số) |
-| `confirm_overload` | body | Không | boolean | Mặc định `false` |
-
----
-
-## E3. GET /api/technicians?skill=MAY_GIAT&area=Q7&status=ACTIVE
-
-Truy vết: US2 (số phiếu đang mở), US4 (lọc tay nghề và địa bàn) – FR2, FR5 – UC2, UC5.
-
-**Response 200 OK**
-
-```json
-{
-  "items": [
-    {
-      "technician_id": "KTV-007",
-      "full_name": "Nguyễn Văn Hùng",
-      "skills": ["MAY_GIAT", "TU_LANH"],
-      "areas": ["Q7", "Q4"],
-      "open_tickets": 12,
-      "at_limit": false
-    },
-    {
-      "technician_id": "KTV-012",
-      "full_name": "Trần Minh Khoa",
-      "skills": ["MAY_GIAT"],
-      "areas": ["Q7"],
-      "open_tickets": 15,
-      "at_limit": true
-    },
-    {
-      "technician_id": "KTV-020",
-      "full_name": "Phạm Thu Trang",
-      "skills": ["MAY_GIAT", "DIEU_HOA"],
-      "areas": ["Q7"],
-      "open_tickets": 0,
-      "at_limit": false
-    }
-  ],
-  "total": 3
-}
-```
-
-**Response 400 Bad Request**
-
-```json
-{
-  "error_code": "VALIDATION_ERROR",
-  "message": "Tham số không hợp lệ.",
-  "details": { "skill": "Giá trị phải thuộc MAY_GIAT, TU_LANH, DIEU_HOA" }
-}
-```
-
-| Mã | Khi nào |
-|---|---|
-| 200 | Thành công. Không có ai phù hợp vẫn trả 200 với `items` rỗng (ngoại lệ 3a ở UC1) |
-| 400 | `skill`, `area`, `status` hoặc `limit` sai giá trị |
-
-Kỹ thuật viên nghỉ (không hoạt động) không xuất hiện khi `status=ACTIVE` (tiêu chí US2-AC3). Kỹ thuật viên chưa có phiếu trả `open_tickets: 0` (tiêu chí US2-AC2).
-
-**Bảng validation**
-
-| Trường | Bắt buộc | Kiểu | Độ dài / dải giá trị |
-|---|---|---|---|
-| `skill` | Không | string | Một trong `MAY_GIAT`, `TU_LANH`, `DIEU_HOA` |
-| `area` | Không | string | Mẫu `Q` + số, 1–2 chữ số |
-| `status` | Không | string | `ACTIVE` (mặc định) hoặc `INACTIVE` |
-| `limit` | Không | integer | 1–100, mặc định 100 |
-
-Hiệu năng yêu cầu (NFR1): phản hồi ≤ 2 giây ở ít nhất 95% lần gọi với 100 kỹ thuật viên.
-
----
+| `category_name` | Không | Một trong sáu nhóm sự cố |
+| `center_code` | Không | Mã trung tâm có trong danh mục |
+| `status` | Không | `ACTIVE` mặc định hoặc `INACTIVE` |
+| `limit` | Không | Số nguyên 1–100, mặc định 100 |
 
 ## E4. POST /api/appointments
 
-Truy vết: US3 – FR3 – UC3, UC4.
+Truy vết: US3 – FR3 – UC3, UC4. `technician_id` được lấy từ phân công hiện hành của phiếu, không
+nhận từ client. Trạng thái lịch mới là `DA_DAT`; lịch đã xác nhận/hủy là dữ liệu lịch sử, không phải
+luồng xác nhận của khách hàng.
 
 **Request**
 
 ```json
 {
-  "ticket_id": "BH-0231",
-  "appointment_type": "PICKUP",
-  "scheduled_start": "2026-10-05T14:00:00+07:00",
+  "ticket_code": "BH-900001/2025",
+  "appointment_type": "NHAN_MAY",
+  "scheduled_start": "2026-10-20T14:00:00+07:00",
   "duration_minutes": 60,
-  "note": "Khách ở chung cư, gọi trước 15 phút"
+  "note": "Gọi trước khi đến"
 }
 ```
-
-Kỹ thuật viên được lấy từ phiếu (kỹ thuật viên đang phụ trách), không truyền trong request.
 
 **Response 201 Created**
 
 ```json
 {
-  "appointment_id": "LH-0088",
-  "ticket_id": "BH-0231",
-  "technician_id": "KTV-007",
-  "appointment_type": "PICKUP",
-  "scheduled_start": "2026-10-05T14:00:00+07:00",
-  "scheduled_end": "2026-10-05T15:00:00+07:00",
-  "status": "PENDING_CONFIRMATION"
-}
-```
-
-**Response 400 Bad Request**
-
-```json
-{
-  "error_code": "VALIDATION_ERROR",
-  "message": "Dữ liệu không hợp lệ.",
-  "details": { "scheduled_start": "Phải ở tương lai" }
-}
-```
-
-**Response 404 Not Found**
-
-```json
-{
-  "error_code": "TICKET_NOT_FOUND",
-  "message": "Không tìm thấy phiếu BH-9999.",
-  "details": {}
-}
-```
-
-**Response 409 Conflict – trùng lịch** (tiêu chí US3-AC2)
-
-```json
-{
-  "error_code": "APPOINTMENT_OVERLAP",
-  "message": "KTV-007 đã có lịch hẹn LH-0079 từ 13:30 đến 14:30 cùng ngày.",
-  "details": { "conflicting_appointment_id": "LH-0079" }
-}
-```
-
-**Response 409 Conflict – phiếu chưa phân công** (tiêu chí US3-AC3)
-
-```json
-{
-  "error_code": "TICKET_NOT_ASSIGNED",
-  "message": "Phiếu BH-0240 chưa được phân công kỹ thuật viên.",
-  "details": { "ticket_status": "PENDING_ASSIGNMENT" }
+  "appointment_id": 1201,
+  "ticket_code": "BH-900001/2025",
+  "technician_code": "KT002",
+  "center_code": "TT04",
+  "appointment_type": "NHAN_MAY",
+  "scheduled_start": "2026-10-20T14:00:00+07:00",
+  "scheduled_end": "2026-10-20T15:00:00+07:00",
+  "status": "DA_DAT"
 }
 ```
 
 | Mã | Khi nào |
 |---|---|
 | 201 | Đặt lịch thành công |
-| 400 | Thiếu trường, sai kiểu hoặc sai dải giá trị |
-| 404 | Không có phiếu với mã đã cho |
-| 409 | `APPOINTMENT_OVERLAP`: trùng lịch với lịch hẹn khác của cùng kỹ thuật viên |
-| 409 | `TICKET_NOT_ASSIGNED`: phiếu chưa ở trạng thái `ASSIGNED` |
+| 400 | Thiếu trường, sai kiểu, loại lịch không hợp lệ hoặc thời lượng ngoài 15–240 phút |
+| 404 | Không tìm thấy phiếu |
+| 409 | Phiếu chưa phân công hoặc lịch giao nhau với lịch khác của cùng kỹ thuật viên |
 
-Quy tắc trùng lịch: lịch A và B trùng nếu `A.start < B.end` và `B.start < A.end`, cùng một kỹ thuật viên.
+Lịch A và B trùng khi `A.start < B.end` và `B.start < A.end` với cùng `technician_id`. Ràng buộc
+PostgreSQL `EXCLUDE` là lớp bảo vệ đồng thời ở DB.
 
-**Bảng validation**
+## 4. Ánh xạ dữ liệu mẫu
 
-| Trường | Bắt buộc | Kiểu | Độ dài / dải giá trị |
-|---|---|---|---|
-| `ticket_id` | Có | string | Mẫu `BH-` + 4 chữ số trở lên |
-| `appointment_type` | Có | string | `PICKUP` (nhận máy) hoặc `DELIVERY` (giao máy) |
-| `scheduled_start` | Có | datetime ISO 8601 | Phải ở tương lai |
-| `duration_minutes` | Có | integer | 15–240 |
-| `note` | Không | string | Tối đa 255 ký tự |
+| CSV nguồn | Bảng/thuộc tính đích | Ghi chú |
+|---|---|---|
+| `service_centers.csv` | `center_code` trên `ticket`, `technician`, `appointment` | Ánh xạ `center_id` nguồn sang mã trung tâm |
+| `issue_categories.csv` | `category_name` trên `ticket`, `technician_skill` | Ánh xạ `category_id` sang tên nhóm |
+| `technicians.csv` | `technician` | Giữ `technician_id` và `technician_code` nguồn |
+| `technician_skills.csv` | `technician_skill` | Giữ proficiency 1–5 |
+| `tickets_history.csv` | `ticket`, `ticket_assignment` | Phiếu lịch sử dùng làm fixture; mã khách/sản phẩm không join ở L4 |
+| `ticket_status_log.csv` | `ticket_status_log` | `changed_by` là ID nguồn dạng chuỗi |
+| `appointments.csv` sinh với seed cố định | `appointment` | Chuẩn hóa/kiểm tra lại kỹ thuật viên, trung tâm và trùng lịch trước nạp |
 
-Hiệu năng yêu cầu (NFR2): kiểm tra trùng lịch ≤ 1 giây với 500 lịch hẹn.
+Không dùng `customers_raw.csv`, `products.csv`, `parts.csv`, `part_stock.csv` hoặc dữ liệu đơn hàng
+trong phạm vi L4.
 
----
-
-## 4. Tự kiểm truy vết
+## 5. Tự kiểm truy vết
 
 | Endpoint | User Story | FR | Use Case |
 |---|---|---|---|
@@ -328,5 +239,3 @@ Hiệu năng yêu cầu (NFR2): kiểm tra trùng lịch ≤ 1 giây với 500 l
 | E2 POST assignment | US1 | FR1, FR4 | UC1 |
 | E3 GET technicians | US2, US4 | FR2, FR5 | UC2, UC5 |
 | E4 POST appointments | US3 | FR3 | UC3, UC4 |
-
-Mọi story MUST (US1, US2, US3) đều có endpoint; mọi endpoint truy vết được về một User Story.
