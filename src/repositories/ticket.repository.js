@@ -1,0 +1,198 @@
+const { AppError } = require('../errors/AppError');
+
+const OPEN_STATUSES = ['DA_PHAN_CONG', 'DANG_XU_LY', 'CHO_LINH_KIEN'];
+const MAX_OPEN_TICKETS = 15;
+
+class TicketRepository {
+  constructor(pool) {
+    this.pool = pool;
+  }
+
+  async list({ status, centerCode, categoryName, limit, offset }) {
+    const values = [];
+    const conditions = [];
+
+    if (status) {
+      values.push(status);
+      conditions.push(`t.status = $${values.length}`);
+    }
+    if (centerCode) {
+      values.push(centerCode);
+      conditions.push(`t.center_code = $${values.length}`);
+    }
+    if (categoryName) {
+      values.push(categoryName);
+      conditions.push(`t.category_name = $${values.length}`);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    values.push(limit, offset);
+    const result = await this.pool.query(
+      `WITH filtered AS (
+         SELECT t.ticket_id, t.ticket_code, t.customer_id, t.product_id,
+                t.serial_no, t.center_code, t.category_name, t.priority,
+                t.status, t.issue_desc, t.received_at, t.due_date,
+                t.closed_at, t.is_warranty
+         FROM ticket AS t
+         ${where}
+       ),
+       page AS (
+         SELECT *
+         FROM filtered
+         ORDER BY due_date ASC, ticket_id ASC
+         LIMIT $${values.length - 1} OFFSET $${values.length}
+       ),
+       total AS (
+         SELECT COUNT(*)::INTEGER AS total FROM filtered
+       )
+       SELECT page.*, total.total
+       FROM total
+       LEFT JOIN page ON TRUE
+       ORDER BY page.due_date ASC NULLS LAST, page.ticket_id ASC NULLS LAST`,
+      values,
+    );
+
+    return {
+      items: result.rows
+        .filter((row) => row.ticket_id !== null)
+        .map(({ total, ...ticket }) => ticket),
+      total: result.rows.length > 0 ? result.rows[0].total : 0,
+    };
+  }
+
+  async assign({ ticketCode, technicianCode, assignedBy, confirmOverload }) {
+    const client = await this.pool.connect();
+    let transactionStarted = false;
+
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+
+      const ticketResult = await client.query(
+        `SELECT ticket_id, ticket_code, center_code, category_name, status
+         FROM ticket
+         WHERE ticket_code = $1
+         FOR UPDATE`,
+        [ticketCode],
+      );
+      const ticket = ticketResult.rows[0];
+      if (!ticket) {
+        throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy phiếu bảo hành.');
+      }
+      if (ticket.status !== 'MOI') {
+        throw new AppError(
+          409,
+          'TICKET_NOT_ASSIGNABLE',
+          'Phiếu không còn ở trạng thái chờ phân công.',
+        );
+      }
+
+      const technicianResult = await client.query(
+        `SELECT technician_id, technician_code, full_name, center_code, is_active
+         FROM technician
+         WHERE technician_code = $1
+         FOR UPDATE`,
+        [technicianCode],
+      );
+      const technician = technicianResult.rows[0];
+      if (!technician) {
+        throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy kỹ thuật viên.');
+      }
+      if (!technician.is_active) {
+        throw new AppError(409, 'TECHNICIAN_INACTIVE', 'Kỹ thuật viên hiện không hoạt động.');
+      }
+      if (technician.center_code !== ticket.center_code) {
+        throw new AppError(
+          409,
+          'CENTER_MISMATCH',
+          'Kỹ thuật viên không thuộc trung tâm của phiếu.',
+        );
+      }
+
+      const skillResult = await client.query(
+        `SELECT 1
+         FROM technician_skill
+         WHERE technician_id = $1 AND category_name = $2`,
+        [technician.technician_id, ticket.category_name],
+      );
+      if (skillResult.rowCount === 0) {
+        throw new AppError(
+          409,
+          'SKILL_MISMATCH',
+          'Kỹ thuật viên chưa có tay nghề cho nhóm sự cố của phiếu.',
+        );
+      }
+
+      const workloadResult = await client.query(
+        `SELECT COUNT(*)::INTEGER AS open_tickets
+         FROM ticket_assignment AS assignment
+         JOIN ticket AS assigned_ticket ON assigned_ticket.ticket_id = assignment.ticket_id
+         WHERE assignment.technician_id = $1
+           AND assignment.ended_at IS NULL
+           AND assigned_ticket.status = ANY($2::VARCHAR[])`,
+        [technician.technician_id, OPEN_STATUSES],
+      );
+      const openTickets = workloadResult.rows[0].open_tickets;
+      if (openTickets >= MAX_OPEN_TICKETS && !confirmOverload) {
+        throw new AppError(
+          409,
+          'OVERLOAD_CONFIRMATION_REQUIRED',
+          `Kỹ thuật viên đã có ${openTickets} phiếu đang mở; cần xác nhận vượt ngưỡng ${MAX_OPEN_TICKETS}.`,
+          { open_tickets: openTickets, max_open_tickets: MAX_OPEN_TICKETS },
+        );
+      }
+
+      const assignmentResult = await client.query(
+        `INSERT INTO ticket_assignment (ticket_id, technician_id, assigned_by)
+         VALUES ($1, $2, $3)
+         RETURNING assigned_at`,
+        [ticket.ticket_id, technician.technician_id, assignedBy],
+      );
+      await client.query(
+        `UPDATE ticket
+         SET status = 'DA_PHAN_CONG'
+         WHERE ticket_id = $1`,
+        [ticket.ticket_id],
+      );
+      await client.query(
+        `INSERT INTO ticket_status_log (
+           ticket_id, from_status, to_status, changed_by, note
+         ) VALUES ($1, 'MOI', 'DA_PHAN_CONG', $2, $3)`,
+        [ticket.ticket_id, assignedBy, `Phân công cho ${technician.technician_code}.`],
+      );
+      await client.query('COMMIT');
+      transactionStarted = false;
+
+      return {
+        ticket_code: ticket.ticket_code,
+        status: 'DA_PHAN_CONG',
+        technician_code: technician.technician_code,
+        assigned_by: assignedBy,
+        assigned_at: assignmentResult.rows[0].assigned_at,
+      };
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Assignment failed and the database transaction could not be rolled back.',
+          );
+        }
+      }
+      if (error.code === '23505') {
+        throw new AppError(
+          409,
+          'TICKET_ALREADY_ASSIGNED',
+          'Phiếu vừa được phân công bởi một thao tác khác.',
+        );
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}
+
+module.exports = { TicketRepository };
