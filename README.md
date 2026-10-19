@@ -29,16 +29,18 @@ Prototype buổi 8: Backend Node.js 20+ (Express 4), PostgreSQL 16+ và API REST
 
 ## Chạy backend (Bước 2)
 
-Backend dùng Node.js 20 trở lên, Express và PostgreSQL. Điểm khởi chạy là `src/server.js`;
+### Yêu cầu môi trường
+
+Node.js 20 LTS, npm 10 và PostgreSQL 16 (có thể chạy PostgreSQL bằng Docker; dùng SQLite nếu cần).
+Cấu hình biến môi trường theo `.env.example`, gồm `DATABASE_URL` và `PORT`.
+
+Backend dùng Express. Điểm khởi chạy là `src/server.js`;
 `src/app.js` cấu hình HTTP routes/middleware, còn `src/db/pool.js` tạo connection pool.
 
 ### Chạy API cục bộ
 
-1. Cài Node.js 20+ và khởi động PostgreSQL 16 trở lên.
-2. Nếu chưa có `.env`, sao chép `.env.example` thành `.env`; nếu đã có thì giữ nguyên và chỉ kiểm tra
-   các giá trị `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` và `DB_PASSWORD`. Dùng một CSDL phát triển
-   mới (mặc định `smartcrm_l4_workshop`), không trỏ vào CSDL legacy hiện có. Tạo CSDL nếu chưa có,
-   ví dụ trong `psql`: `CREATE DATABASE smartcrm_l4_workshop;`. Không commit `.env`.
+1. Cài Node.js 20 LTS, npm 10 và khởi động PostgreSQL 16 (hoặc PostgreSQL bằng Docker).
+2. Sao chép `.env.example` thành `.env` và cấu hình `DATABASE_URL` cùng `PORT`. Không commit `.env`.
 3. Tại thư mục gốc repository, tạo schema:
 
    ```powershell
@@ -52,7 +54,7 @@ Backend dùng Node.js 20 trở lên, Express và PostgreSQL. Điểm khởi ch�
    npm start
    ```
 
-5. API dùng cổng `PORT`, nếu không có thì `APP_PORT`, mặc định `8000`. Kiểm tra
+5. API dùng cổng `PORT` (mặc định `8000`). Kiểm tra
    `http://localhost:<cổng>/health` để xác nhận API đang chạy và
    `http://localhost:<cổng>/health/ready` để kiểm tra kết nối PostgreSQL.
 
@@ -77,16 +79,15 @@ Sau khi cấu hình `.env`, chạy `docker compose up --build`. API được pub
 `db_data`; khi volume mới được tạo, PostgreSQL tự chạy schema và fixture. `docker compose down -v`
 sẽ xóa volume và dữ liệu đó.
 
-### Trạng thái module L4
+### Trạng thái tại Buổi 8
 
-- [x] Schema PostgreSQL sáu bảng nghiệp vụ và ràng buộc dữ liệu L4.
-- [x] Fixture kỹ thuật viên, 17 phiếu đang mở và một phiếu `MOI` để thử phân công; không cần tải CSV
-  dataset riêng để khởi động prototype.
-- [x] `GET /api/tickets` liệt kê/lọc phiếu; `POST /api/tickets/{ticket_code}/assignment` phân công
-  có kiểm tra trung tâm, tay nghề, tải công việc và ghi lịch sử trong một transaction.
-- [x] Đã kiểm thử migration, seed và hai endpoint cốt lõi trên PostgreSQL thật; kết quả tại
-  [docs/buoi-08-evidence.md](docs/buoi-08-evidence.md).
-- [ ] Các endpoint gợi ý kỹ thuật viên, lịch hẹn và cập nhật trạng thái sẽ làm ở lát cắt tiếp theo.
+- [✓] Đã xử lý feedback BT1 → `docs/thay-doi-thiet-ke.md`.
+- [✓] Cấu trúc `src/` theo kiến trúc 4 lớp.
+- [✓] Migration + seed chạy được.
+- [✓] CRUD Ticket qua 3 lớp.
+- [ ] AssignService (phân công kỹ thuật viên) – Buổi 9–10.
+- [ ] Appointment + kiểm tra trùng lịch.
+- [ ] Tối thiểu 3 test case.
 
 Việc tiếp nhận/tạo phiếu và xóa phiếu thuộc L2 hoặc thao tác phá hủy dữ liệu, không đưa vào API L4;
 module hiện cung cấp đọc danh sách phiếu và các thao tác phân công đúng phạm vi SRS.
