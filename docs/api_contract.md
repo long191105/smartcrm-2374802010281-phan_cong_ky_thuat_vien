@@ -73,6 +73,8 @@ trả rỗng nếu chỉ nạp dữ liệu nguồn; tạo fixture `BH-900001/202
 
 Truy vết: US1 – FR1, FR4 – UC1. Chỉ phân công phiếu đang ở `MOI`. `assigned_by` là mã người thực hiện
 nguồn dạng chuỗi, không phải khóa ngoại sang hệ thống người dùng.
+Do mã phiếu chứa dấu `/`, client phải URL-encode giá trị path parameter, ví dụ
+`BH-900001%2F2025`.
 
 Fixture `BH-900001/2025` dùng kỹ thuật viên `KT002`, đang có 17 phiếu mở; vì vượt ngưỡng 15, quản lý
 xác nhận tiếp tục phân công.
