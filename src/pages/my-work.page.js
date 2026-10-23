@@ -19,21 +19,23 @@ const NEXT_STATUS = {
   ],
 };
 
-export async function mountMyWorkPage(root) {
+export async function mountMyWorkPage(root, routeParams = {}) {
   let technicians = { state: 'loading' };
   let tickets = { state: 'empty', data: { items: [] } };
   let history = { state: 'empty', data: { items: [] } };
-  let technicianCode = '';
+  let technicianCode = routeParams.technician_code || '';
   let selectedTicket = null;
   let onlyOpen = true;
   let feedback = '';
+  let completedTicket = null;
 
   function render() {
     const allTickets = tickets.data?.items || [];
     const shown = allTickets.filter((ticket) => !onlyOpen || OPEN_STATUSES.has(ticket.status));
     const techItems = technicians.data?.items || [];
     root.innerHTML = `
-      ${feedback ? `<p class="notice" role="status">${escapeHtml(feedback)}</p>` : ''}
+      ${feedback ? `<div class="notice" role="status">${escapeHtml(feedback)}${completedTicket ? `
+        <a class="button button-primary workflow-next" href="#assign">Quy trình hoàn tất · Tiếp tục phiếu khác</a>` : ''}</div>` : ''}
       <section class="panel">
         <div class="section-heading"><div><h2>Kỹ thuật viên</h2><p>Chọn danh tính kỹ thuật viên trong dữ liệu đã nạp.</p></div>
           <label>Người phụ trách<select data-role="technician" ${technicians.state !== 'ready' ? 'disabled' : ''}>
@@ -116,6 +118,8 @@ export async function mountMyWorkPage(root) {
     if (event.target.matches('[data-role="technician"]')) {
       technicianCode = event.target.value;
       selectedTicket = null;
+      completedTicket = null;
+      feedback = '';
       if (technicianCode) await loadTickets();
       else render();
     }
@@ -138,19 +142,26 @@ export async function mountMyWorkPage(root) {
       feedback = 'Chưa có phiếu nào được phân công cho kỹ thuật viên này.';
       return render();
     }
-    if (button.dataset.action === 'select-ticket') return selectTicket(button.dataset.code);
+    if (button.dataset.action === 'select-ticket') {
+      completedTicket = null;
+      feedback = '';
+      return selectTicket(button.dataset.code);
+    }
   });
   root.addEventListener('submit', async (event) => {
     if (event.target.dataset.form !== 'status') return;
     event.preventDefault();
     const values = new FormData(event.target);
     try {
+      const completedCode = selectedTicket.ticketCode;
+      const nextStatus = String(values.get('status'));
       await ticketsApi.updateStatus(selectedTicket.ticketCode, {
-        status: String(values.get('status')),
+        status: nextStatus,
         changed_by: technicianCode,
         note: String(values.get('note') || '').trim(),
       });
-      feedback = 'Đã cập nhật trạng thái phiếu.';
+      feedback = `Đã cập nhật phiếu ${completedCode} sang ${nextStatus}.`;
+      completedTicket = { ticketCode: completedCode, status: nextStatus };
       selectedTicket = null;
       await loadTickets();
     } catch (error) {
@@ -160,4 +171,13 @@ export async function mountMyWorkPage(root) {
   });
 
   await loadTechnicians();
+  if (technicianCode) {
+    await loadTickets();
+    if (routeParams.ticket_code && tickets.data?.items.some((ticket) => ticket.ticket_code === routeParams.ticket_code)) {
+      await selectTicket(routeParams.ticket_code);
+    } else if (routeParams.ticket_code) {
+      feedback = 'Không tìm thấy phiếu trong danh sách công việc của kỹ thuật viên đã chọn.';
+      render();
+    }
+  }
 }

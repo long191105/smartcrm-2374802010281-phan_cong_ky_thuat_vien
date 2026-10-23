@@ -13,6 +13,7 @@ test('listTickets normalizes pagination and forwards supported filters', async (
   });
 
   const result = await service.listTickets({
+    ticket_code: 'BH-900001/2025',
     status: 'MOI',
     center_code: 'TT04',
     category_name: 'MAN_HINH',
@@ -22,11 +23,21 @@ test('listTickets normalizes pagination and forwards supported filters', async (
 
   assert.deepEqual(result, { items: [], total: 0 });
   assert.deepEqual(received, {
+    ticketCode: 'BH-900001/2025',
     status: 'MOI',
     centerCode: 'TT04',
     categoryName: 'MAN_HINH',
     limit: 20,
     offset: 5,
+  });
+
+  test('listTickets rejects malformed exact ticket filters', async () => {
+    const service = new TicketService({ async list() { assert.fail('repository must not run'); } });
+
+    await assert.rejects(
+      () => service.listTickets({ ticket_code: 'not-a-ticket' }),
+      { statusCode: 422, code: 'VALIDATION_ERROR' },
+    );
   });
 });
 

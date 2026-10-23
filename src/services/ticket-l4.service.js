@@ -21,6 +21,7 @@ const ticketCodeSchema = z.object({
   ticket_code: z.string().regex(/^BH-\d{6}\/\d{4}$/, 'Mã phiếu không hợp lệ.'),
 });
 const listQuerySchema = z.object({
+  ticket_code: z.preprocess((value) => value === '' ? undefined : value, z.string().regex(/^BH-\d{6}\/\d{4}$/, 'Mã phiếu không hợp lệ.').optional()),
   status: z.preprocess((value) => value === '' ? undefined : value, z.enum(TICKET_STATUSES).optional()),
   center_code: z.preprocess((value) => value === '' ? undefined : value, z.string().regex(/^TT\d{2}$/, 'Mã trung tâm không hợp lệ.').optional()),
   category_name: z.preprocess((value) => value === '' ? undefined : value, z.enum(CATEGORY_NAMES).optional()),
@@ -45,6 +46,7 @@ class TicketService {
   async listTickets(query) {
     const input = validate(listQuerySchema, query);
     return this.ticketRepository.list({
+      ticketCode: input.ticket_code,
       status: input.status,
       centerCode: input.center_code,
       categoryName: input.category_name,

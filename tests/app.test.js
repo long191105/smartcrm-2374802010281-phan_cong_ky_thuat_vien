@@ -194,7 +194,7 @@ test('malformed JSON is reported as a client error', async () => {
 });
 
 test('GET /api/tickets forwards filters and returns the list contract', async () => {
-  const response = await fetch(`${baseUrl}/api/tickets?status=MOI&center_code=TT04`, {
+  const response = await fetch(`${baseUrl}/api/tickets?status=MOI&center_code=TT04&ticket_code=BH-900001%2F2025`, {
     headers: sessionHeaders,
   });
 
@@ -202,7 +202,7 @@ test('GET /api/tickets forwards filters and returns the list contract', async ()
   assert.deepEqual(await response.json(), { items: [], total: 0 });
   assert.deepEqual(ticketServiceCalls.at(-1), {
     method: 'list',
-    query: { status: 'MOI', center_code: 'TT04' },
+    query: { status: 'MOI', center_code: 'TT04', ticket_code: 'BH-900001/2025' },
   });
 });
 
