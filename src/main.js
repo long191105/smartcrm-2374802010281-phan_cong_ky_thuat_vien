@@ -5,9 +5,9 @@ import { mountMyWorkPage } from './pages/my-work.page.js';
 
 const app = document.querySelector('#app');
 const pages = {
-  '#assign': { title: 'Phân công', mount: mountAssignmentPage },
-  '#appointments': { title: 'Lịch hẹn', mount: mountAppointmentsPage },
-  '#my-work': { title: 'Công việc của tôi', mount: mountMyWorkPage },
+  '#assign': { title: 'M1 · Phân công kỹ thuật viên', useCases: ['UC1', 'UC2', 'UC5', 'UC8', 'UC9'], mount: mountAssignmentPage },
+  '#appointments': { title: 'M2 · Đặt lịch hẹn giao – nhận máy', useCases: ['UC3', 'UC4', 'UC7'], mount: mountAppointmentsPage },
+  '#my-work': { title: 'M3 · Công việc của tôi', useCases: ['UC6', 'UC9', 'UC10'], mount: mountMyWorkPage },
 };
 
 function renderApp() {
@@ -20,13 +20,15 @@ function renderApp() {
   }
   const page = pages[currentHash] || pages['#assign'];
   app.innerHTML = `<div class="app-shell">
-    <aside class="sidebar">
-      <a class="brand" href="#assign"><span class="brand-mark">S</span><span>Smart CRM<small>Track SE · L4</small></span></a>
-      <nav aria-label="Điều hướng chính">${Object.entries(pages).map(([hash, item]) => `<a href="${hash}" class="${currentHash === hash ? 'active' : ''}">${item.title}</a>`).join('')}</nav>
-      <div class="sidebar-note"><span>Trung tâm bảo hành</span><strong>Phân công &amp; lịch hẹn</strong><small>Dữ liệu trực tiếp từ API L4</small></div>
-    </aside>
-    <main class="main-content"><div id="page-root" class="page-root" aria-label="${page.title}"></div>
-      <footer>Smart CRM · L4 — Ưu tiên xử lý phiếu gần hạn cam kết</footer></main>
+    <header class="wireframe-meta">
+      <div class="wireframe-caption"><strong>Wireframe · L4 Phân công kỹ thuật viên và lịch hẹn</strong>
+        <span>Nhãn cam = use case · khung đỏ nét đứt = thông báo ngoại lệ · chip màu = giá trị danh mục</span></div>
+      <nav class="use-case-nav" aria-label="Điều hướng màn hình">${Object.entries(pages).map(([hash, item]) => item.useCases.map((useCase) => `<a href="${hash}" class="use-case-chip ${currentHash === hash ? 'active' : ''}" aria-current="${currentHash === hash ? 'page' : 'false'}">${useCase}</a>`).join('')).join('')}</nav>
+    </header>
+    <main class="screen-frame">
+      <header class="screen-title"><h1>${page.title}</h1></header>
+      <div id="page-root" class="screen-body" aria-label="${page.title}"></div>
+    </main>
   </div>`;
   const pageRoot = app.querySelector('#page-root');
   page.mount(pageRoot);

@@ -24,11 +24,6 @@ export async function mountAssignmentPage(root) {
     const tickets = queue.data?.items || [];
     const techs = technicians.data?.items || [];
     root.innerHTML = `
-      <header class="page-heading">
-        <div><p class="eyebrow">M1 · UC1 / UC5</p><h1>Phân công kỹ thuật viên</h1>
-          <p>Ưu tiên phiếu có hạn cam kết gần nhất; workload được so với ngưỡng tối đa.</p></div>
-        <div class="metric-card"><span>Tổng phiếu chờ phù hợp</span><strong>${queue.data?.total ?? '—'}</strong><small>So sánh: hạn cam kết gần nhất</small></div>
-      </header>
       ${feedback ? `<p class="notice" role="status">${escapeHtml(feedback)}</p>` : ''}
       <section class="panel">
         <div class="section-heading"><div><h2>Phiếu chờ phân công</h2><p>Danh sách lấy trực tiếp từ API, sắp theo hạn cam kết.</p></div>

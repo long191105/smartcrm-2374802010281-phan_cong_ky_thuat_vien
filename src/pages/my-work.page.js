@@ -33,11 +33,6 @@ export async function mountMyWorkPage(root) {
     const shown = allTickets.filter((ticket) => !onlyOpen || OPEN_STATUSES.has(ticket.status));
     const techItems = technicians.data?.items || [];
     root.innerHTML = `
-      <header class="page-heading">
-        <div><p class="eyebrow">M3 · UC6 / UC10</p><h1>Công việc của tôi</h1>
-          <p>Ưu tiên xử lý phiếu có hạn cam kết gần nhất; chỉ cho phép chuyển trạng thái hợp lệ.</p></div>
-        <div class="metric-card"><span>Phiếu đang mở</span><strong>${allTickets.filter((ticket) => OPEN_STATUSES.has(ticket.status)).length}</strong><small>So sánh: danh sách gán cho kỹ thuật viên đã chọn</small></div>
-      </header>
       ${feedback ? `<p class="notice" role="status">${escapeHtml(feedback)}</p>` : ''}
       <section class="panel">
         <div class="section-heading"><div><h2>Kỹ thuật viên</h2><p>Chọn danh tính kỹ thuật viên trong dữ liệu đã nạp.</p></div>
@@ -70,11 +65,12 @@ export async function mountMyWorkPage(root) {
       </section>
       ${selectedTicket ? `<section class="panel">
         <h2>Cập nhật trạng thái · ${escapeHtml(selectedTicket.ticketCode)}</h2>
-        <p>Trạng thái hiện tại: ${Badge(selectedTicket.status)}</p>
-        ${NEXT_STATUS[selectedTicket.status]?.length ? `<form class="form-grid" data-form="status">
-          <label>Chuyển sang<select name="status">${NEXT_STATUS[selectedTicket.status].map((item) => `<option value="${item.value}">${item.label}</option>`).join('')}</select></label>
-          <label>Ghi chú<input name="note" maxlength="255" placeholder="Ghi nhận kết quả xử lý"></label>
-          <div class="form-actions"><button class="button button-primary">Lưu trạng thái</button></div>
+        <div class="desktop-status-row"><span>Trạng thái hiện tại</span><div class="detail-value">${Badge(selectedTicket.status)}</div></div>
+        ${NEXT_STATUS[selectedTicket.status]?.length ? `<form class="status-form-grid" data-form="status">
+          <label>Chuyển sang</label><select name="status">${NEXT_STATUS[selectedTicket.status].map((item) => `<option value="${item.value}">${item.label}</option>`).join('')}</select>
+          <label>Ghi chú</label><input class="full-row" name="note" maxlength="255" placeholder="Ghi nhận kết quả xử lý">
+          <div class="state-panel state-error appointment-notice full-row"><strong>E4</strong><span>Không thể quay lại trạng thái trước hoặc bỏ qua bước xử lý.</span></div>
+          <div class="form-actions"><button class="button button-primary">Lưu</button></div>
         </form>` : '<p class="helper-text">Phiếu đã hoàn tất; không thể quay lại trạng thái trước.</p>'}
         ${history.state === 'error' ? DataState({ state: 'error', retryAction: 'retry-history' }) : ''}
         ${history.state === 'ready' ? `<h3>Lịch sử trạng thái</h3><ul class="history-list">${(history.data.items || []).map((item) => `<li>

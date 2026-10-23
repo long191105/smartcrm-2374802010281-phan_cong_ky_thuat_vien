@@ -82,8 +82,9 @@ Khởi động backend trước, sau đó mở terminal khác ở thư mục g�
 npm run dev
 ```
 
-Mở URL Vite in trong terminal (mặc định `http://localhost:5173`). Ba màn hình M1, M2, M3 lấy dữ
-liệu thật qua API. `npm run build` tạo `dist/`; backend phục vụ bản build đó ở `/`.
+Mở URL Vite in trong terminal (mặc định `http://localhost:5173`). Ba màn hình desktop M1, M2, M3
+được bố cục theo `docs/wireframe/` và lấy dữ liệu thật qua API. `npm run build` tạo `dist/`;
+backend phục vụ bản build đó ở `/`.
 Các lệnh cài đặt là `npm install` và `npm run build`.
 
 Prototype chưa có API đăng nhập. Client chỉ đọc token từ `localStorage` key
