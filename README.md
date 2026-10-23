@@ -129,6 +129,11 @@ duyệt gọi API qua Vite proxy; backend phải được chạy trước. Nếu
 `VITE_API_PROXY_TARGET` trong `.env` rồi khởi động lại Vite.
 
 Thanh menu đầu trang có ba mục điều hướng: **Phân công**, **Lịch hẹn** và **Công việc của tôi**.
+Luồng thao tác chính đi theo thứ tự: phân công phiếu ở M1 → liên kết **Tiếp tục: đặt lịch hẹn** mở
+đúng phiếu ở M2 → sau khi đặt lịch, liên kết **Tiếp tục: cập nhật công việc** mở phiếu cùng kỹ thuật
+viên ở M3 → cập nhật trạng thái. Mã phiếu được truyền qua bộ lọc chính xác của API, vì vậy bước M2
+không phụ thuộc phiếu nằm ở trang phân trang nào. Sau khi cập nhật, có thể quay lại M1 để xử lý phiếu
+tiếp theo.
 
 ### 3.6 Dừng ứng dụng
 

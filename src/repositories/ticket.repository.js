@@ -10,9 +10,14 @@ class TicketRepository {
     this.pool = pool;
   }
 
-  async list({ status, centerCode, categoryName, limit, offset }) {
+  async list({ ticketCode, status, centerCode, categoryName, limit, offset }) {
     const values = [];
     const conditions = [];
+
+    if (ticketCode) {
+      values.push(ticketCode);
+      conditions.push(`t.ticket_code = $${values.length}`);
+    }
 
     if (status) {
       values.push(status);

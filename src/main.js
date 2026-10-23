@@ -18,7 +18,8 @@ let renderSequence = 0;
 
 async function renderApp() {
   const sequence = ++renderSequence;
-  const currentHash = window.location.hash || '#assign';
+  const [currentHash = '#assign', query = ''] = (window.location.hash || '#assign').split('?');
+  const routeParams = Object.fromEntries(new URLSearchParams(query));
   if (currentHash === '#login') {
     mountLoginPage(app);
     return;
@@ -75,7 +76,7 @@ async function renderApp() {
     </main>
   </div>`;
   const pageRoot = app.querySelector('#page-root');
-  page.mount(pageRoot);
+  page.mount(pageRoot, routeParams);
 }
 
 window.addEventListener('hashchange', renderApp);

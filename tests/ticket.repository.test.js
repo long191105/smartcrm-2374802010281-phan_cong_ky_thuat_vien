@@ -66,6 +66,7 @@ test('list returns an accurate total even when the requested page is empty', asy
   });
 
   const result = await repository.list({
+    ticketCode: 'BH-900001/2025',
     status: 'MOI',
     centerCode: 'TT04',
     categoryName: 'MAN_HINH',
@@ -74,9 +75,9 @@ test('list returns an accurate total even when the requested page is empty', asy
   });
 
   assert.deepEqual(result, { items: [], total: 18 });
-  assert.deepEqual(queryValues, ['MOI', 'TT04', 'MAN_HINH', 10, 50]);
+  assert.deepEqual(queryValues, ['BH-900001/2025', 'MOI', 'TT04', 'MAN_HINH', 10, 50]);
   assert.match(queryText, /LEFT JOIN page ON TRUE/);
-  assert.match(queryText, /t\.status = \$1 AND t\.center_code = \$2 AND t\.category_name = \$3/);
+  assert.match(queryText, /t\.ticket_code = \$1 AND t\.status = \$2 AND t\.center_code = \$3 AND t\.category_name = \$4/);
 });
 
 test('assignment is atomic and writes status and assignment history', async () => {

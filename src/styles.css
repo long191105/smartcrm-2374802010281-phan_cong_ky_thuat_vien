@@ -75,7 +75,8 @@ td small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px
 .state-panel p { margin: 0; }
 .state-error { border: 3px dashed #e52828; color: #c91d1d; background: #fff6f5; }
 .helper-text { margin: 12px 0 0; font-size: 13px; }
-.notice { margin: 0 0 16px; padding: 12px 15px; border-radius: 7px; color: #155b36; background: #e8f8ef; font-size: 14px; }
+.notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 16px; padding: 12px 15px; border-radius: 7px; color: #155b36; background: #e8f8ef; font-size: 14px; }
+.workflow-next { flex: 0 0 auto; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 16px 24px; }
 .form-grid label { font-size: 14px; }
 .form-grid input, .form-grid select { width: 100%; }

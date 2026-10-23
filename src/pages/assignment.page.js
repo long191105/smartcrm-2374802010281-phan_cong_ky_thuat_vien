@@ -19,12 +19,14 @@ export async function mountAssignmentPage(root) {
   let selectedTechnician = null;
   let history = { state: 'empty', data: { items: [] } };
   let feedback = '';
+  let assignedTicket = null;
 
   function render() {
     const tickets = queue.data?.items || [];
     const techs = technicians.data?.items || [];
     root.innerHTML = `
-      ${feedback ? `<p class="notice" role="status">${escapeHtml(feedback)}</p>` : ''}
+      ${feedback ? `<div class="notice" role="status">${escapeHtml(feedback)}${assignedTicket ? `
+        <a class="button button-primary workflow-next" href="#appointments?ticket_code=${encodeURIComponent(assignedTicket.ticketCode)}">Tiếp tục: đặt lịch hẹn</a>` : ''}</div>` : ''}
       <section class="panel">
         <div class="section-heading"><div><h2>Phiếu chờ phân công</h2><p>Danh sách lấy trực tiếp từ API, sắp theo hạn cam kết.</p></div>
           <form class="filter-form" data-form="filters">
@@ -147,7 +149,11 @@ export async function mountAssignmentPage(root) {
       offset = Number(button.dataset.offset);
       return loadQueue();
     }
-    if (button.dataset.action === 'select-ticket') return selectTicket(button.dataset.code);
+    if (button.dataset.action === 'select-ticket') {
+      assignedTicket = null;
+      feedback = '';
+      return selectTicket(button.dataset.code);
+    }
     if (button.dataset.action === 'choose-tech') {
       selectedTechnician = technicians.data.items.find(
         (tech) => tech.technician_code === button.dataset.code,
@@ -176,6 +182,10 @@ export async function mountAssignmentPage(root) {
           confirm_overload: confirmOverload,
         });
         feedback = 'Đã phân công phiếu thành công.';
+        assignedTicket = {
+          ticketCode: selectedTicket.ticketCode,
+          technicianCode: selectedTechnician.technician_code,
+        };
         selectedTicket = null;
         selectedTechnician = null;
         await loadQueue();

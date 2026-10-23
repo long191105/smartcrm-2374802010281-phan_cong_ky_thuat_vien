@@ -74,7 +74,8 @@ endpoint đăng ký công khai. Mật khẩu được lưu dưới dạng hash s
 
 ## E1. GET /api/tickets?status=MOI&center_code=TT04
 
-Truy vết: US1 – FR1 – UC1. Bộ lọc `status`, `center_code`, `category_name` là tùy chọn; không truyền
+Truy vết: US1 – FR1 – UC1. Bộ lọc `ticket_code`, `status`, `center_code`, `category_name` là tùy chọn;
+`ticket_code` lọc chính xác một phiếu để điều hướng tiếp tục luồng giữa các màn hình. Không truyền
 `status` thì trả danh sách theo phân trang.
 
 **Response 200 OK**
@@ -93,7 +94,7 @@ trả rỗng nếu chỉ nạp dữ liệu nguồn; tạo fixture `BH-900001/202
 | Mã | Khi nào |
 |---|---|
 | 200 | Thành công; không có kết quả trả `items: []` |
-| 422 | Mã trạng thái, trung tâm hoặc nhóm sự cố không hợp lệ; `fields` nêu trường sai |
+| 422 | Mã phiếu, trạng thái, trung tâm hoặc nhóm sự cố không hợp lệ; `fields` nêu trường sai |
 
 ## E2. POST /api/tickets/{ticket_code}/assignment
 

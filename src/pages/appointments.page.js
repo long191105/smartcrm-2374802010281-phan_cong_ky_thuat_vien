@@ -23,7 +23,7 @@ function vietnamDate(value) {
   return `${fields.year}-${fields.month}-${fields.day}`;
 }
 
-export async function mountAppointmentsPage(root) {
+export async function mountAppointmentsPage(root, routeParams = {}) {
   let date = today();
   let ticketOffset = 0;
   let tickets = { state: 'loading' };
@@ -32,12 +32,14 @@ export async function mountAppointmentsPage(root) {
   let feedback = '';
   let duration = 30;
   let appointmentStart = defaultAppointmentTime();
+  let appointmentResult = null;
 
   function render() {
     const ticketItems = tickets.data?.items || [];
     const appointmentItems = appointments.data?.items || [];
     root.innerHTML = `
-      ${feedback ? `<p class="notice" role="status">${escapeHtml(feedback)}</p>` : ''}
+      ${feedback ? `<div class="notice" role="status">${escapeHtml(feedback)}${appointmentResult ? `
+        <a class="button button-primary workflow-next" href="#my-work?technician_code=${encodeURIComponent(appointmentResult.technicianCode)}&amp;ticket_code=${encodeURIComponent(appointmentResult.ticketCode)}">Tiếp tục: cập nhật công việc</a>` : ''}</div>` : ''}
       <section class="panel">
         <div class="section-heading"><div><h2>Phiếu đã phân công</h2><p>Chọn phiếu để lấy kỹ thuật viên phụ trách từ hệ thống.</p></div></div>
         ${DataState({
@@ -120,10 +122,16 @@ export async function mountAppointmentsPage(root) {
     try {
       const data = await ticketsApi.list({
         status: 'DA_PHAN_CONG',
+        ticket_code: routeParams.ticket_code,
         limit: TICKET_PAGE_SIZE,
         offset: ticketOffset,
       });
       tickets = { state: data.items.length ? 'ready' : 'empty', data };
+      const requestedTicket = routeParams.ticket_code
+        ? data.items.find((ticket) => ticket.ticket_code === routeParams.ticket_code)
+        : null;
+      if (requestedTicket) selected = toTicketView(requestedTicket);
+      else if (routeParams.ticket_code) feedback = 'Phiếu từ bước phân công chưa còn trong trạng thái đã phân công.';
     } catch (error) {
       tickets = { state: 'error', error };
     }
@@ -174,6 +182,8 @@ export async function mountAppointmentsPage(root) {
     if (button.dataset.action === 'select-ticket') {
       const raw = tickets.data.items.find((ticket) => ticket.ticket_code === button.dataset.code);
       selected = raw ? toTicketView(raw) : null;
+      appointmentResult = null;
+      feedback = '';
       appointmentStart = defaultAppointmentTime();
       duration = 30;
       loadAppointments();
@@ -218,6 +228,10 @@ export async function mountAppointmentsPage(root) {
         note: String(values.get('note') || '').trim(),
       });
       feedback = `Đã đặt lịch từ ${formatDate(created.start_at)} đến ${formatDate(created.end_at)}.`;
+      appointmentResult = {
+        ticketCode: selected.ticketCode,
+        technicianCode: selected.technicianCode,
+      };
       date = vietnamDate(new Date(created.start_at));
       await loadAppointments();
     } catch (error) {
@@ -229,6 +243,7 @@ export async function mountAppointmentsPage(root) {
   });
 
   await Promise.all([loadTickets(), loadAppointments()]);
+  if (selected) await loadAppointments();
 }
 
 function updateEndTime(root, durationMinutes) {
