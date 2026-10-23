@@ -3,7 +3,7 @@ const test = require('node:test');
 const { AppError } = require('../src/errors/AppError');
 const { TicketRepository } = require('../src/repositories/ticket.repository');
 
-function createDatabase({ workload = 0, ticketStatus = 'MOI' } = {}) {
+function createDatabase({ workload = 0, ticketStatus = 'MOI', proficiency = 3 } = {}) {
   const queries = [];
   const client = {
     async query(sql, values = []) {
@@ -32,8 +32,8 @@ function createDatabase({ workload = 0, ticketStatus = 'MOI' } = {}) {
           }],
         };
       }
-      if (query.startsWith('SELECT 1 FROM technician_skill')) {
-        return { rowCount: 1, rows: [{ '?column?': 1 }] };
+      if (query.startsWith('SELECT proficiency')) {
+        return { rowCount: 1, rows: [{ proficiency }] };
       }
       if (query.startsWith('SELECT COUNT(*)::INTEGER AS open_tickets')) {
         return { rows: [{ open_tickets: workload }] };
@@ -123,6 +123,23 @@ test('assignment requires explicit confirmation above workload threshold', async
   assert.ok(!database.queries.some(({ sql }) => sql.startsWith('INSERT INTO ticket_assignment')));
 });
 
+test('assignment rejects a technician below the minimum skill proficiency', async () => {
+  const database = createDatabase({ proficiency: 2 });
+  const repository = new TicketRepository(database.pool);
+
+  await assert.rejects(
+    () => repository.assign({
+      ticketCode: 'BH-900001/2025',
+      technicianCode: 'KT002',
+      assignedBy: '8',
+      confirmOverload: true,
+    }),
+    { statusCode: 409, code: 'SKILL_MISMATCH' },
+  );
+  assert.ok(database.queries.some(({ sql }) => sql === 'ROLLBACK'));
+  assert.ok(!database.queries.some(({ sql }) => sql.startsWith('INSERT INTO ticket_assignment')));
+});
+
 test('assignment is permitted after the manager confirms an overloaded technician', async () => {
   const database = createDatabase({ workload: 17 });
   const repository = new TicketRepository(database.pool);
@@ -152,4 +169,65 @@ test('assignment rejects a ticket that is no longer waiting', async () => {
     { statusCode: 409, code: 'TICKET_NOT_ASSIGNABLE' },
   );
   assert.ok(database.queries.some(({ sql }) => sql === 'ROLLBACK'));
+});
+
+test('status changes verify the current technician and write history atomically', async () => {
+  const queries = [];
+  const client = {
+    async query(sql, values = []) {
+      const query = sql.trim();
+      queries.push({ query, values });
+      if (query.startsWith('SELECT ticket.ticket_id')) {
+        return { rows: [{ ticket_id: 900001, status: 'DA_PHAN_CONG', technician_code: 'KT002' }] };
+      }
+      return { rows: [], rowCount: 1 };
+    },
+    release() {},
+  };
+  const repository = new TicketRepository({ async connect() { return client; } });
+
+  const result = await repository.updateStatus({
+    ticketCode: 'BH-900001/2025',
+    status: 'DANG_XU_LY',
+    changedBy: 'KT002',
+    note: 'Bắt đầu kiểm tra',
+  });
+
+  assert.deepEqual(result, {
+    ticket_code: 'BH-900001/2025',
+    from_status: 'DA_PHAN_CONG',
+    status: 'DANG_XU_LY',
+    changed_by: 'KT002',
+  });
+  assert.ok(queries.some(({ query }) => query.startsWith('UPDATE ticket')));
+  assert.ok(queries.some(({ query }) => query.startsWith('INSERT INTO ticket_status_log')));
+  assert.equal(queries.at(-1).query, 'COMMIT');
+});
+
+test('status changes reject an invalid transition before updating the ticket', async () => {
+  const queries = [];
+  const client = {
+    async query(sql) {
+      const query = sql.trim();
+      queries.push(query);
+      if (query.startsWith('SELECT ticket.ticket_id')) {
+        return { rows: [{ ticket_id: 900001, status: 'DA_PHAN_CONG', technician_code: 'KT002' }] };
+      }
+      return { rows: [], rowCount: 1 };
+    },
+    release() {},
+  };
+  const repository = new TicketRepository({ async connect() { return client; } });
+
+  await assert.rejects(
+    () => repository.updateStatus({
+      ticketCode: 'BH-900001/2025',
+      status: 'HOAN_TAT',
+      changedBy: 'KT002',
+      note: '',
+    }),
+    { statusCode: 409, code: 'INVALID_STATUS_TRANSITION' },
+  );
+  assert.ok(queries.includes('ROLLBACK'));
+  assert.ok(!queries.some((query) => query.startsWith('UPDATE ticket')));
 });

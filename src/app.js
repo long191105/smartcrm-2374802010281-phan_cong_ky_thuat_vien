@@ -1,15 +1,40 @@
 const express = require('express');
+const path = require('path');
 const { AppError } = require('./errors/AppError');
 const { createTicketRoutes } = require('./routes/ticket.routes');
+const { createTechnicianRoutes } = require('./routes/technician.routes');
+const { createAppointmentRoutes } = require('./routes/appointment.routes');
+const { createAuthRoutes } = require('./routes/auth.routes');
+const { createRequireAuth } = require('./middleware/require-auth');
+const { AuthRepository } = require('./repositories/auth.repository');
+const { AuthService } = require('./services/auth.service');
 
-function createApp({ pool, ticketService }) {
+function createApp({
+  pool,
+  ticketService,
+  technicianService,
+  appointmentService,
+  authService,
+  env = process.env,
+}) {
   if (!pool || typeof pool.query !== 'function') {
     throw new TypeError('createApp requires a PostgreSQL-compatible pool');
   }
 
   const app = express();
+  const sessionCookieOptions = {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.AUTH_COOKIE_SECURE === 'true'
+      || (env.NODE_ENV === 'production' && env.AUTH_COOKIE_SECURE !== 'false'),
+    path: '/',
+  };
+  const resolvedAuthService = authService || new AuthService(new AuthRepository(pool));
+  const requireAuth = createRequireAuth(resolvedAuthService, sessionCookieOptions);
   app.disable('x-powered-by');
   app.use(express.json({ limit: '1mb' }));
+
+  app.use(express.static(path.resolve(__dirname, '..', 'dist')));
 
   app.get('/', (req, res) => {
     res.json({ service: 'smartcrm-l4-api', status: 'ok' });
@@ -28,12 +53,21 @@ function createApp({ pool, ticketService }) {
     }
   });
 
+  app.use('/api/auth', createAuthRoutes({
+    authService: resolvedAuthService,
+    cookieOptions: sessionCookieOptions,
+    requireAuth,
+  }));
+  app.use('/api', requireAuth);
   app.use('/api/tickets', createTicketRoutes({ pool, ticketService }));
+  app.use('/api/technicians', createTechnicianRoutes({ pool, service: technicianService }));
+  app.use('/api/appointments', createAppointmentRoutes({ pool, service: appointmentService }));
 
   app.use((req, res) => {
     res.status(404).json({
-      error_code: 'NOT_FOUND',
+      error: 'NOT_FOUND',
       message: 'Không tìm thấy tài nguyên.',
+      fields: {},
     });
   });
 
@@ -44,34 +78,35 @@ function createApp({ pool, ticketService }) {
 
     if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
       return res.status(400).json({
-        error_code: 'INVALID_JSON',
+        error: 'INVALID_JSON',
         message: 'Nội dung JSON không hợp lệ.',
+        fields: {},
       });
     }
 
     if (error instanceof AppError) {
       const response = {
-        error_code: error.code,
+        error: error.code,
         message: error.message,
+        fields: error.details || {},
       };
-      if (error.details !== undefined) {
-        response.details = error.details;
-      }
       return res.status(error.statusCode).json(response);
     }
 
     if (req.path === '/health/ready') {
       console.error('Database readiness check failed:', error);
       return res.status(503).json({
-        error_code: 'DATABASE_UNAVAILABLE',
+        error: 'DATABASE_UNAVAILABLE',
         message: 'Cơ sở dữ liệu hiện không khả dụng.',
+        fields: {},
       });
     }
 
     console.error('Unhandled request error:', error);
     return res.status(500).json({
-      error_code: 'INTERNAL_ERROR',
+      error: 'INTERNAL_ERROR',
       message: 'Đã xảy ra lỗi hệ thống.',
+      fields: {},
     });
   });
 

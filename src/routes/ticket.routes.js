@@ -10,6 +10,8 @@ function createTicketRoutes({ pool, ticketService } = {}) {
 
   router.get('/', controller.list);
   router.post('/:ticketCode/assignment', controller.assign);
+  router.get('/:ticketCode/history', controller.history);
+  router.patch('/:ticketCode/status', controller.updateStatus);
 
   return router;
 }

@@ -22,6 +22,25 @@ class TicketController {
       next(error);
     }
   };
+
+  history = async (req, res, next) => {
+    try {
+      res.json(await this.ticketService.getHistory(req.params.ticketCode));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateStatus = async (req, res, next) => {
+    try {
+      res.json(await this.ticketService.updateStatus(
+        req.params.ticketCode,
+        req.body,
+      ));
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 module.exports = { TicketController };

@@ -1,107 +1,83 @@
-const { AppError } = require('../errors/AppError');
+const { z } = require('zod');
+const { validate } = require('../validation');
 
-const TICKET_STATUSES = new Set([
+const TICKET_STATUSES = [
   'MOI',
   'DA_PHAN_CONG',
   'DANG_XU_LY',
   'CHO_LINH_KIEN',
   'HOAN_TAT',
   'DA_DONG',
-]);
-const CATEGORY_NAMES = new Set([
+];
+const CATEGORY_NAMES = [
   'MAN_HINH',
   'PIN',
   'SAC',
   'PHAN_MEM',
   'NUOC_VAO',
   'KHAC',
-]);
-
+];
+const ticketCodeSchema = z.object({
+  ticket_code: z.string().regex(/^BH-\d{6}\/\d{4}$/, 'Mã phiếu không hợp lệ.'),
+});
+const listQuerySchema = z.object({
+  status: z.preprocess((value) => value === '' ? undefined : value, z.enum(TICKET_STATUSES).optional()),
+  center_code: z.preprocess((value) => value === '' ? undefined : value, z.string().regex(/^TT\d{2}$/, 'Mã trung tâm không hợp lệ.').optional()),
+  category_name: z.preprocess((value) => value === '' ? undefined : value, z.enum(CATEGORY_NAMES).optional()),
+  limit: z.preprocess((value) => value === undefined || value === '' ? 100 : Number(value), z.number().int().min(1).max(100)),
+  offset: z.preprocess((value) => value === undefined || value === '' ? 0 : Number(value), z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)),
+});
+const assignmentSchema = z.object({
+  technician_code: z.string().regex(/^KT\d{3}$/, 'Phải có định dạng KT và 3 chữ số.'),
+  assigned_by: z.string().trim().min(1, 'Cần mã người phân công.').max(100, 'Tối đa 100 ký tự.'),
+  confirm_overload: z.boolean().default(false),
+});
+const statusSchema = z.object({
+  status: z.enum(['DANG_XU_LY', 'CHO_LINH_KIEN', 'HOAN_TAT']),
+  changed_by: z.string().regex(/^KT\d{3}$/, 'Phải là mã kỹ thuật viên dạng KT và 3 chữ số.'),
+  note: z.string().trim().max(255).optional().default(''),
+});
 class TicketService {
   constructor(ticketRepository) {
     this.ticketRepository = ticketRepository;
   }
 
   async listTickets(query) {
-    const status = this.#optionalEnum(query.status, TICKET_STATUSES, 'status');
-    const categoryName = this.#optionalEnum(
-      query.category_name,
-      CATEGORY_NAMES,
-      'category_name',
-    );
-    const centerCode = query.center_code;
-    if (centerCode && !/^TT\d{2}$/.test(centerCode)) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'center_code không hợp lệ.');
-    }
-
-    const limit = this.#integer(query.limit, 100, 1, 100, 'limit');
-    const offset = this.#integer(query.offset, 0, 0, Number.MAX_SAFE_INTEGER, 'offset');
-
+    const input = validate(listQuerySchema, query);
     return this.ticketRepository.list({
-      status,
-      centerCode,
-      categoryName,
-      limit,
-      offset,
+      status: input.status,
+      centerCode: input.center_code,
+      categoryName: input.category_name,
+      limit: input.limit,
+      offset: input.offset,
     });
   }
 
   async assignTicket(ticketCode, body) {
-    if (!/^BH-\d{6}\/\d{4}$/.test(ticketCode)) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'ticket_code không hợp lệ.');
-    }
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Request body phải là object JSON.');
-    }
-
-    const errors = {};
-    if (typeof body.technician_code !== 'string'
-      || !/^KT\d{3}$/.test(body.technician_code)) {
-      errors.technician_code = 'Phải có định dạng KT và 3 chữ số.';
-    }
-    if (typeof body.assigned_by !== 'string'
-      || body.assigned_by.trim().length === 0
-      || body.assigned_by.length > 100) {
-      errors.assigned_by = 'Phải là mã người thực hiện dạng chuỗi, tối đa 100 ký tự.';
-    }
-    if (body.confirm_overload !== undefined
-      && typeof body.confirm_overload !== 'boolean') {
-      errors.confirm_overload = 'Phải là boolean.';
-    }
-    if (Object.keys(errors).length > 0) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Dữ liệu không hợp lệ.', errors);
-    }
-
+    const code = validate(ticketCodeSchema, { ticket_code: ticketCode }).ticket_code;
+    const input = validate(assignmentSchema, body);
     return this.ticketRepository.assign({
-      ticketCode,
-      technicianCode: body.technician_code,
-      assignedBy: body.assigned_by.trim(),
-      confirmOverload: body.confirm_overload === true,
+      ticketCode: code,
+      technicianCode: input.technician_code,
+      assignedBy: input.assigned_by,
+      confirmOverload: input.confirm_overload,
     });
   }
 
-  #optionalEnum(value, allowed, field) {
-    if (value === undefined || value === '') return undefined;
-    if (typeof value !== 'string' || !allowed.has(value)) {
-      throw new AppError(400, 'VALIDATION_ERROR', `${field} không hợp lệ.`);
-    }
-    return value;
+  async getHistory(ticketCode) {
+    const code = validate(ticketCodeSchema, { ticket_code: ticketCode }).ticket_code;
+    return this.ticketRepository.getHistory(code);
   }
 
-  #integer(value, fallback, minimum, maximum, field) {
-    if (value === undefined || value === '') return fallback;
-    if (!/^\d+$/.test(String(value))) {
-      throw new AppError(400, 'VALIDATION_ERROR', `${field} phải là số nguyên hợp lệ.`);
-    }
-    const number = Number(value);
-    if (!Number.isSafeInteger(number) || number < minimum || number > maximum) {
-      throw new AppError(
-        400,
-        'VALIDATION_ERROR',
-        `${field} phải nằm trong khoảng ${minimum}–${maximum}.`,
-      );
-    }
-    return number;
+  async updateStatus(ticketCode, body) {
+    const code = validate(ticketCodeSchema, { ticket_code: ticketCode }).ticket_code;
+    const input = validate(statusSchema, body);
+    return this.ticketRepository.updateStatus({
+      ticketCode: code,
+      status: input.status,
+      changedBy: input.changed_by,
+      note: input.note,
+    });
   }
 }
 
