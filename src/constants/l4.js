@@ -1,0 +1,14 @@
+const OPEN_TICKET_STATUSES = Object.freeze([
+  'DA_PHAN_CONG',
+  'DANG_XU_LY',
+  'CHO_LINH_KIEN',
+]);
+
+const MAX_OPEN_TICKETS = 15;
+const MIN_SKILL_PROFICIENCY = 3;
+
+module.exports = {
+  MAX_OPEN_TICKETS,
+  MIN_SKILL_PROFICIENCY,
+  OPEN_TICKET_STATUSES,
+};

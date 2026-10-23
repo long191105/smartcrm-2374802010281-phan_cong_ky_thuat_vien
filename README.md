@@ -25,7 +25,7 @@ US7. Là khách hàng, tôi muốn nhận thông báo nhắc lịch hẹn giao �
 
 5. CÔNG NGHỆ DỰ KIẾN
 (Ngôn ngữ / framework / CSDL hoặc công cụ chính)
-Prototype buổi 8: Backend Node.js 20+ (Express 4), PostgreSQL 16+ và API REST/JSON; frontend chưa thuộc lát cắt triển khai. Dùng Postman/curl kiểm thử API, Git/GitHub quản lý mã nguồn.
+Prototype Buổi 9: Frontend Vite, backend Node.js 20+ (Express 4), PostgreSQL 16+ và API REST/JSON. Git/GitHub quản lý mã nguồn.
 
 ## Chạy backend (Bước 2)
 
@@ -72,6 +72,27 @@ script ánh xạ ID trung tâm/nhóm sự cố sang mã/tên nguồn và chỉ s
 đang mở. Lệnh seed thêm một phiếu `MOI` để thử UC1; chỉ tạo 17 phiếu workload tổng hợp khi chưa có
 phiếu lịch sử nguồn. Timestamp nguồn không kèm múi giờ được hiểu là giờ Việt Nam UTC+07.
 
+### Chạy frontend
+
+Frontend dùng Vite và gọi API qua `VITE_API_BASE_URL` (mặc định `/api`). Sao chép `.env.example`
+thành `.env`, giữ `VITE_API_PROXY_TARGET=http://localhost:8000` nếu backend chạy tại cổng 8000.
+Khởi động backend trước, sau đó mở terminal khác ở thư mục gốc:
+
+```powershell
+npm run dev
+```
+
+Mở URL Vite in trong terminal (mặc định `http://localhost:5173`). Ba màn hình M1, M2, M3 lấy dữ
+liệu thật qua API. `npm run build` tạo `dist/`; backend phục vụ bản build đó ở `/`.
+Các lệnh cài đặt là `npm install` và `npm run build`.
+
+Prototype chưa có API đăng nhập. Client chỉ đọc token từ `localStorage` key
+`smartcrm.auth.token`, gửi token nếu hệ thống xác thực được tích hợp, và xoá token/chuyển về màn
+hết phiên khi nhận 401. `localStorage` có thể bị JavaScript cùng origin đọc (rủi ro XSS), vì vậy
+chỉ phù hợp prototype; môi trường thật nên dùng cookie `HttpOnly`, `Secure`, `SameSite` do server đặt.
+Schema L4 không lưu tên/số điện thoại khách hàng; giao diện chỉ hiển thị mã khách hàng tham chiếu và
+không dựng thông tin liên hệ giả.
+
 ### Chạy bằng Docker Compose
 
 Sau khi cấu hình `.env`, chạy `docker compose up --build`. API được publish ở cổng `API_PORT`
@@ -79,15 +100,19 @@ Sau khi cấu hình `.env`, chạy `docker compose up --build`. API được pub
 `db_data`; khi volume mới được tạo, PostgreSQL tự chạy schema và fixture. `docker compose down -v`
 sẽ xóa volume và dữ liệu đó.
 
-### Trạng thái tại Buổi 8
+### Trạng thái sau Buổi 9
 
 - [✓] Đã xử lý feedback BT1 → `docs/thay-doi-thiet-ke.md`.
 - [✓] Cấu trúc `src/` theo kiến trúc 4 lớp.
 - [✓] Migration + seed chạy được.
 - [✓] CRUD Ticket qua 3 lớp.
-- [ ] AssignService (phân công kỹ thuật viên) – Buổi 9–10.
-- [ ] Appointment + kiểm tra trùng lịch.
-- [ ] Tối thiểu 3 test case.
+- [✓] M1 phân công, gợi ý kỹ thuật viên theo trung tâm/tay nghề/workload.
+- [✓] M2 đặt lịch và kiểm tra trùng; M3 xem công việc và chuyển trạng thái tiến.
+- [✓] Frontend tách API/hooks/pages/components; 3 màn hình gọi API thật.
+- [✓] Phản hồi lỗi thống nhất `{ error, message, fields }`; đầu vào không hợp lệ trả 422.
+- [✓] Test hợp đồng mapper kiểm tra tên trường, ISO 8601, null và che số điện thoại.
+
+Câu hỏi nghiệp vụ mà giao diện trả lời: **“Hôm nay tôi phải xử lý phiếu nào trước?”**
 
 Việc tiếp nhận/tạo phiếu và xóa phiếu thuộc L2 hoặc thao tác phá hủy dữ liệu, không đưa vào API L4;
 module hiện cung cấp đọc danh sách phiếu và các thao tác phân công đúng phạm vi SRS.

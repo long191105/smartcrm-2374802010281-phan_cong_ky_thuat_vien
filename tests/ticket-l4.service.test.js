@@ -36,7 +36,7 @@ test('listTickets rejects statuses outside the dataset vocabulary', async () => 
   await assert.rejects(
     () => service.listTickets({ status: 'MOI_TIEP_NHAN' }),
     (error) => error instanceof AppError
-      && error.statusCode === 400
+      && error.statusCode === 422
       && error.code === 'VALIDATION_ERROR',
   );
 });
@@ -68,7 +68,7 @@ test('assignTicket rejects malformed identifier and request values', async () =>
 
   await assert.rejects(
     () => service.assignTicket('BH0001', {}),
-    { statusCode: 400, code: 'VALIDATION_ERROR' },
+    { statusCode: 422, code: 'VALIDATION_ERROR' },
   );
   await assert.rejects(
     () => service.assignTicket('BH-900001/2025', {
@@ -77,7 +77,7 @@ test('assignTicket rejects malformed identifier and request values', async () =>
       confirm_overload: 'yes',
     }),
     (error) => error instanceof AppError
-      && error.statusCode === 400
+      && error.statusCode === 422
       && Object.keys(error.details).length === 3,
   );
 });

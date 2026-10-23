@@ -6,8 +6,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "dev": "vite",
+    "build": "vite build",
     "test": "node --test",
-    "test:l4": "node --test tests/app.test.js tests/ticket-l4.service.test.js tests/ticket.repository.test.js tests/schema.test.js tests/db-migrate.test.js tests/dataset-import.test.js",
+    "test:l4": "node --test tests/app.test.js tests/ticket-l4.service.test.js tests/ticket.repository.test.js tests/l4-services.test.js tests/l4-repositories.test.js tests/ticket-view.test.js tests/schema.test.js tests/db-migrate.test.js tests/dataset-import.test.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
     "import:dataset": "node src/db/import-dataset.js"
@@ -18,6 +20,10 @@
   "dependencies": {
     "dotenv": "^18.0.8",
     "express": "4.21.2",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
   }
 }

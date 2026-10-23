@@ -1,7 +1,9 @@
 const { AppError } = require('../errors/AppError');
-
-const OPEN_STATUSES = ['DA_PHAN_CONG', 'DANG_XU_LY', 'CHO_LINH_KIEN'];
-const MAX_OPEN_TICKETS = 15;
+const {
+  MAX_OPEN_TICKETS,
+  MIN_SKILL_PROFICIENCY,
+  OPEN_TICKET_STATUSES,
+} = require('../constants/l4');
 
 class TicketRepository {
   constructor(pool) {
@@ -16,6 +18,7 @@ class TicketRepository {
       values.push(status);
       conditions.push(`t.status = $${values.length}`);
     }
+
     if (centerCode) {
       values.push(centerCode);
       conditions.push(`t.center_code = $${values.length}`);
@@ -32,8 +35,17 @@ class TicketRepository {
          SELECT t.ticket_id, t.ticket_code, t.customer_id, t.product_id,
                 t.serial_no, t.center_code, t.category_name, t.priority,
                 t.status, t.issue_desc, t.received_at, t.due_date,
-                t.closed_at, t.is_warranty
+                t.closed_at, t.is_warranty, current_assignment.technician_code,
+                current_assignment.technician_name
          FROM ticket AS t
+         LEFT JOIN LATERAL (
+           SELECT technician.technician_code, technician.full_name AS technician_name
+           FROM ticket_assignment AS assignment
+           JOIN technician ON technician.technician_id = assignment.technician_id
+           WHERE assignment.ticket_id = t.ticket_id AND assignment.ended_at IS NULL
+           ORDER BY assignment.assigned_at DESC
+           LIMIT 1
+         ) AS current_assignment ON TRUE
          ${where}
        ),
        page AS (
@@ -58,6 +70,108 @@ class TicketRepository {
         .map(({ total, ...ticket }) => ticket),
       total: result.rows.length > 0 ? result.rows[0].total : 0,
     };
+  }
+
+  async getHistory(ticketCode) {
+    const ticket = await this.pool.query(
+      'SELECT ticket_id FROM ticket WHERE ticket_code = $1',
+      [ticketCode],
+    );
+    if (ticket.rowCount === 0) {
+      throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy phiếu bảo hành.');
+    }
+
+    const result = await this.pool.query(
+      `SELECT changed_at AS occurred_at, 'STATUS' AS event_type,
+              from_status, to_status, changed_by AS actor, NULL::VARCHAR AS technician_code,
+              note
+       FROM ticket_status_log
+       WHERE ticket_id = $1
+       UNION ALL
+       SELECT assignment.assigned_at, 'ASSIGNMENT', NULL::VARCHAR, NULL::VARCHAR,
+              assignment.assigned_by, technician.technician_code, assignment.reason
+       FROM ticket_assignment AS assignment
+       JOIN technician ON technician.technician_id = assignment.technician_id
+       WHERE assignment.ticket_id = $1
+       ORDER BY occurred_at DESC`,
+      [ticket.rows[0].ticket_id],
+    );
+    return { items: result.rows };
+  }
+
+  async updateStatus({ ticketCode, status, changedBy, note }) {
+    const client = await this.pool.connect();
+    let transactionStarted = false;
+
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+      const result = await client.query(
+        `SELECT ticket.ticket_id, ticket.status, technician.technician_code
+         FROM ticket
+         JOIN ticket_assignment AS assignment
+           ON assignment.ticket_id = ticket.ticket_id AND assignment.ended_at IS NULL
+         JOIN technician ON technician.technician_id = assignment.technician_id
+         WHERE ticket.ticket_code = $1
+         FOR UPDATE OF ticket`,
+        [ticketCode],
+      );
+      const ticket = result.rows[0];
+      if (!ticket) {
+        throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy phiếu hoặc phiếu chưa được phân công.');
+      }
+      if (ticket.technician_code !== changedBy) {
+        throw new AppError(403, 'FORBIDDEN', 'Chỉ kỹ thuật viên đang phụ trách mới được cập nhật phiếu.');
+      }
+
+      const transitions = {
+        DA_PHAN_CONG: ['DANG_XU_LY'],
+        DANG_XU_LY: ['CHO_LINH_KIEN', 'HOAN_TAT'],
+        CHO_LINH_KIEN: ['DANG_XU_LY', 'HOAN_TAT'],
+      };
+      if (!transitions[ticket.status]?.includes(status)) {
+        throw new AppError(
+          409,
+          'INVALID_STATUS_TRANSITION',
+          'Không thể chuyển phiếu về trạng thái trước hoặc bỏ qua bước xử lý.',
+          { status: 'Chọn trạng thái tiếp theo hợp lệ.' },
+        );
+      }
+
+      await client.query(
+        `UPDATE ticket
+         SET status = $2, closed_at = CASE WHEN $2 = 'HOAN_TAT' THEN NOW() ELSE closed_at END
+         WHERE ticket_id = $1`,
+        [ticket.ticket_id, status],
+      );
+      await client.query(
+        `INSERT INTO ticket_status_log (ticket_id, from_status, to_status, changed_by, note)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [ticket.ticket_id, ticket.status, status, changedBy, note || null],
+      );
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return {
+        ticket_code: ticketCode,
+        from_status: ticket.status,
+        status,
+        changed_by: changedBy,
+      };
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Status update failed and the database transaction could not be rolled back.',
+          );
+        }
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async assign({ ticketCode, technicianCode, assignedBy, confirmOverload }) {
@@ -110,16 +224,18 @@ class TicketRepository {
       }
 
       const skillResult = await client.query(
-        `SELECT 1
+        `SELECT proficiency
          FROM technician_skill
          WHERE technician_id = $1 AND category_name = $2`,
         [technician.technician_id, ticket.category_name],
       );
-      if (skillResult.rowCount === 0) {
+      if (skillResult.rowCount === 0
+        || skillResult.rows[0].proficiency < MIN_SKILL_PROFICIENCY) {
         throw new AppError(
           409,
           'SKILL_MISMATCH',
-          'Kỹ thuật viên chưa có tay nghề cho nhóm sự cố của phiếu.',
+          `Kỹ thuật viên cần tay nghề từ mức ${MIN_SKILL_PROFICIENCY} cho nhóm sự cố của phiếu.`,
+          { category_name: 'Kỹ thuật viên chưa đạt mức tay nghề tối thiểu.' },
         );
       }
 
@@ -130,7 +246,7 @@ class TicketRepository {
          WHERE assignment.technician_id = $1
            AND assignment.ended_at IS NULL
            AND assigned_ticket.status = ANY($2::VARCHAR[])`,
-        [technician.technician_id, OPEN_STATUSES],
+        [technician.technician_id, OPEN_TICKET_STATUSES],
       );
       const openTickets = workloadResult.rows[0].open_tickets;
       if (openTickets >= MAX_OPEN_TICKETS && !confirmOverload) {
