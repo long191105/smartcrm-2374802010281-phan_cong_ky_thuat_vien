@@ -3,7 +3,10 @@ import { ticketsApi } from '../api/tickets.api.js';
 import { Badge } from '../components/Badge.js';
 import { DataState } from '../components/DataState.js';
 import { escapeHtml, formatDate } from '../components/html.js';
+import { Pagination } from '../components/Pagination.js';
 import { toTicketView } from '../api/ticket-view.mjs';
+
+const TICKET_PAGE_SIZE = 100;
 
 function today() {
   return vietnamDate(new Date());
@@ -22,6 +25,7 @@ function vietnamDate(value) {
 
 export async function mountAppointmentsPage(root) {
   let date = today();
+  let ticketOffset = 0;
   let tickets = { state: 'loading' };
   let appointments = { state: 'loading' };
   let selected = null;
@@ -53,6 +57,14 @@ export async function mountAppointmentsPage(root) {
             }).join('')}
           </tbody></table></div>`,
         })}
+        ${tickets.state === 'ready' && tickets.data.total > TICKET_PAGE_SIZE
+          ? Pagination({
+            total: tickets.data.total,
+            limit: TICKET_PAGE_SIZE,
+            offset: ticketOffset,
+            action: 'page-tickets',
+          })
+          : ''}
       </section>
       <section class="panel">
         <h2>Thông tin phiếu</h2>
@@ -106,7 +118,11 @@ export async function mountAppointmentsPage(root) {
     tickets = { state: 'loading' };
     render();
     try {
-      const data = await ticketsApi.list({ status: 'DA_PHAN_CONG', limit: 100 });
+      const data = await ticketsApi.list({
+        status: 'DA_PHAN_CONG',
+        limit: TICKET_PAGE_SIZE,
+        offset: ticketOffset,
+      });
       tickets = { state: data.items.length ? 'ready' : 'empty', data };
     } catch (error) {
       tickets = { state: 'error', error };
@@ -134,6 +150,10 @@ export async function mountAppointmentsPage(root) {
     if (!button) return;
     if (button.dataset.action === 'retry-tickets') return loadTickets();
     if (button.dataset.action === 'retry-appointments') return loadAppointments();
+    if (button.dataset.action === 'page-tickets') {
+      ticketOffset = Number(button.dataset.offset);
+      return loadTickets();
+    }
     if (button.dataset.action === 'start-appointments') {
       window.location.hash = '#assign';
       return;

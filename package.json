@@ -9,10 +9,11 @@
     "dev": "vite",
     "build": "vite build",
     "test": "node --test",
-    "test:l4": "node --test tests/app.test.js tests/ticket-l4.service.test.js tests/ticket.repository.test.js tests/l4-services.test.js tests/l4-repositories.test.js tests/ticket-view.test.js tests/schema.test.js tests/db-migrate.test.js tests/dataset-import.test.js",
+    "test:l4": "node --test tests/app.test.js tests/auth.service.test.js tests/ticket-l4.service.test.js tests/ticket.repository.test.js tests/l4-services.test.js tests/l4-repositories.test.js tests/ticket-view.test.js tests/schema.test.js tests/db-migrate.test.js tests/dataset-import.test.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
-    "import:dataset": "node src/db/import-dataset.js"
+    "import:dataset": "node src/db/import-dataset.js",
+    "auth:bootstrap": "node src/db/bootstrap-user.js"
   },
   "engines": {
     "node": ">=20"

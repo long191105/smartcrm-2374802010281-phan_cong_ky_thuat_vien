@@ -12,6 +12,7 @@ services:
       - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./migrations/002_tickets.sql:/docker-entrypoint-initdb.d/02-indexes.sql:ro
       - ./seeds/001_demo.sql:/docker-entrypoint-initdb.d/03-demo.sql:ro
+      - ./migrations/003_auth.sql:/docker-entrypoint-initdb.d/04-auth.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
@@ -29,6 +30,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       PORT: 8000
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
     depends_on:
       db:
         # CHO db san sang nhan ket noi, khong chi cho container khoi dong.

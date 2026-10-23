@@ -1,5 +1,4 @@
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
-const tokenStorageKey = 'smartcrm.auth.token';
 
 export class ApiError extends Error {
   constructor(status, payload) {
@@ -12,16 +11,18 @@ export class ApiError extends Error {
 }
 
 export async function request(path, options = {}) {
-  const headers = new Headers(options.headers || {});
+  const { skipUnauthorizedRedirect = false, ...fetchOptions } = options;
+  const headers = new Headers(fetchOptions.headers || {});
   headers.set('Accept', 'application/json');
-  if (options.body !== undefined) headers.set('Content-Type', 'application/json');
-  const token = window.localStorage.getItem(tokenStorageKey);
-  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (fetchOptions.body !== undefined) headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(`${apiBaseUrl}${path}`, { ...options, headers });
-  if (response.status === 401) {
-    window.localStorage.removeItem(tokenStorageKey);
-    window.location.assign('/#login');
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...fetchOptions,
+    headers,
+    credentials: 'same-origin',
+  });
+  if (response.status === 401 && !skipUnauthorizedRedirect) {
+    window.location.hash = '#login';
     throw new ApiError(401, { error: 'UNAUTHORIZED', message: 'Phiên đăng nhập đã hết hạn.' });
   }
 

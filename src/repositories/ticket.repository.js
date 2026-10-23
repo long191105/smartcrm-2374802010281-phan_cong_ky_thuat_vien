@@ -140,7 +140,8 @@ class TicketRepository {
 
       await client.query(
         `UPDATE ticket
-         SET status = $2, closed_at = CASE WHEN $2 = 'HOAN_TAT' THEN NOW() ELSE closed_at END
+         SET status = $2::VARCHAR,
+             closed_at = CASE WHEN $2::VARCHAR = 'HOAN_TAT' THEN NOW() ELSE closed_at END
          WHERE ticket_id = $1`,
         [ticket.ticket_id, status],
       );

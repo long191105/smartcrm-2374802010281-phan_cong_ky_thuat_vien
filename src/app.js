@@ -4,13 +4,33 @@ const { AppError } = require('./errors/AppError');
 const { createTicketRoutes } = require('./routes/ticket.routes');
 const { createTechnicianRoutes } = require('./routes/technician.routes');
 const { createAppointmentRoutes } = require('./routes/appointment.routes');
+const { createAuthRoutes } = require('./routes/auth.routes');
+const { createRequireAuth } = require('./middleware/require-auth');
+const { AuthRepository } = require('./repositories/auth.repository');
+const { AuthService } = require('./services/auth.service');
 
-function createApp({ pool, ticketService, technicianService, appointmentService }) {
+function createApp({
+  pool,
+  ticketService,
+  technicianService,
+  appointmentService,
+  authService,
+  env = process.env,
+}) {
   if (!pool || typeof pool.query !== 'function') {
     throw new TypeError('createApp requires a PostgreSQL-compatible pool');
   }
 
   const app = express();
+  const sessionCookieOptions = {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.AUTH_COOKIE_SECURE === 'true'
+      || (env.NODE_ENV === 'production' && env.AUTH_COOKIE_SECURE !== 'false'),
+    path: '/',
+  };
+  const resolvedAuthService = authService || new AuthService(new AuthRepository(pool));
+  const requireAuth = createRequireAuth(resolvedAuthService, sessionCookieOptions);
   app.disable('x-powered-by');
   app.use(express.json({ limit: '1mb' }));
 
@@ -33,6 +53,12 @@ function createApp({ pool, ticketService, technicianService, appointmentService 
     }
   });
 
+  app.use('/api/auth', createAuthRoutes({
+    authService: resolvedAuthService,
+    cookieOptions: sessionCookieOptions,
+    requireAuth,
+  }));
+  app.use('/api', requireAuth);
   app.use('/api/tickets', createTicketRoutes({ pool, ticketService }));
   app.use('/api/technicians', createTechnicianRoutes({ pool, service: technicianService }));
   app.use('/api/appointments', createAppointmentRoutes({ pool, service: appointmentService }));

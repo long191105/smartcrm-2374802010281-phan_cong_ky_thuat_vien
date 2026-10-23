@@ -221,7 +221,7 @@ Các giá trị trên là đề xuất của nhóm cho phạm vi học phần.
 - Mã trung tâm và nhóm sự cố được ánh xạ về `center_code`/`category_name`, không nạp thành bảng riêng.
 - Ngưỡng tối đa 15 phiếu đang mở và mốc cảnh báo 24 giờ là giá trị mặc định, có thể cấu hình.
 - Hệ thống không tính thời gian di chuyển giữa hai lịch hẹn (tối ưu tuyến thuộc US9 – WON'T).
-- Quản lý đã đăng nhập; việc xác thực nằm ngoài phạm vi tài liệu này.
+- Quản lý đã đăng nhập bằng tài khoản được cấp bởi quản trị viên; xác thực dùng phiên cookie HttpOnly.
 
 ---
 

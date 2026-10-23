@@ -5,6 +5,8 @@ US7 xác nhận lịch hẹn của khách hàng nằm ngoài phạm vi.
 
 - Base URL: `/api`
 - Định dạng: JSON, UTF-8. Thời gian nhận/trả theo ISO 8601.
+- Các endpoint nghiệp vụ yêu cầu phiên đăng nhập hợp lệ. Cookie phiên `smartcrm_session` được
+  server đặt với `HttpOnly`, `SameSite=Lax`; bật `AUTH_COOKIE_SECURE=true` khi chạy qua HTTPS.
 - Thuật ngữ, mã trạng thái và định dạng ID theo `srs.md` mục 1.3.
 - L4 sử dụng mã nguồn từ dataset: mã phiếu dạng `BH-000001/2025`, mã kỹ thuật viên dạng `KT001`,
   mã trung tâm dạng `TT01`, nhóm sự cố như `MAN_HINH`. Các ví dụ có mã `BH-900001/2025` là fixture
@@ -27,10 +29,30 @@ Nhóm sự cố hợp lệ: `MAN_HINH`, `PIN`, `SAC`, `PHAN_MEM`, `NUOC_VAO`, `K
 Trung tâm được nhận diện bằng `center_code`, ví dụ `TT01`; trạng thái kỹ thuật viên là `ACTIVE` hoặc
 `INACTIVE`.
 
-## 2. Danh sách endpoint
+## 2. Đăng nhập và phiên
+
+| Phương thức | Đường dẫn | Mục đích |
+|---|---|---|
+| POST | `/api/auth/login` | Kiểm tra thông tin đăng nhập và tạo phiên |
+| GET | `/api/auth/me` | Lấy người dùng của phiên hiện tại |
+| POST | `/api/auth/logout` | Thu hồi phiên và xóa cookie |
+
+Đăng nhập nhận JSON `{ "username": "...", "password": "..." }`. Thành công trả `200` với
+`{ "user": { "username": "...", "displayName": "..." } }` và cookie phiên HttpOnly; thông tin mật
+khẩu hoặc mã phiên không nằm trong response JSON. Thông tin không hợp lệ trả `401 INVALID_CREDENTIALS`
+với cùng thông báo để không tiết lộ username có tồn tại hay không. Body sai định dạng trả `422`.
+Phiên hết hạn sau 8 giờ. `GET /api/auth/me` trả `401 UNAUTHORIZED` nếu chưa đăng nhập hoặc phiên hết
+hạn; `POST /api/auth/logout` trả `204` sau khi thu hồi phiên.
+
+Tài khoản ban đầu do quản trị viên tạo bằng `npm run auth:bootstrap` từ biến môi trường; không có
+endpoint đăng ký công khai. Mật khẩu được lưu dưới dạng hash scrypt. Các endpoint nghiệp vụ bên dưới
+đều yêu cầu cookie phiên hợp lệ; phiên hiện chưa phân quyền theo vai trò.
+
+## 3. Danh sách endpoint
 
 | # | Phương thức | Đường dẫn | Mục đích | Truy vết |
 |---|---|---|---|---|
+| E0 | POST/GET/POST | `/api/auth/login`, `/api/auth/me`, `/api/auth/logout` | Đăng nhập, xem phiên, đăng xuất | Bảo vệ luồng L4 |
 | E1 | GET | `/api/tickets?status=MOI&center_code=TT04` | Lấy và lọc phiếu | US1, FR1 |
 | E2 | POST | `/api/tickets/{ticket_code}/assignment` | Phân công một phiếu | US1, FR1, FR4 |
 | E3 | GET | `/api/technicians?category_name=MAN_HINH&center_code=TT04&status=ACTIVE` | Gợi ý kỹ thuật viên và khối lượng | US2, US4; FR2, FR5 |
