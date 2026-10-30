@@ -4,10 +4,9 @@ Bốn cột: công cụ · dùng vào việc gì · áp dụng ở tệp / hàm 
 
 | Công cụ | Dùng vào việc gì | Áp dụng ở tệp / hàm nào | Em đã kiểm chứng thế nào |
 |---|---|---|---|
-| Claude (trợ lý AI dạng chat) | Đọc phản hồi BT1, đề BT2 và repo mẫu; đề xuất quyết định SỬA / GIỮ và soạn nháp nhật ký thay đổi | `docs/thay-doi-thiet-ke.md` (TD-01…TD-07) | *(em điền: đã đối chiếu từng mục với phản hồi gốc, mục nào em đổi quyết định, mục nào em tự viết lại bằng lời của mình)* |
-| *(thêm dòng khi dùng)* Claude / Copilot | *(vd: gợi ý cách viết hàm kiểm tay nghề QT-08)* | *(vd: `src/services/assign.service.js`, hàm `isEligible`)* | *(vd: viết test giá trị biên proficiency = 2 và 3; chạy `npm test`; sửa điều kiện nếu bản gợi ý sai)* |
-| — không dùng — | *(các phần em tự làm hoàn toàn)* | *(vd: `migrations/`, `tests/`, quy tắc QT-07…)* | Không áp dụng |
+| Claude (trợ lý AI dạng chat) | Đọc phản hồi BT1, đề BT2 và repo mẫu; đề xuất quyết định SỬA / GIỮ và soạn nháp nhật ký thay đổi | `docs/thay-doi-thiet-ke.md` (TD-01…TD-07) | Các quyết định được ghi lại trong nhật ký thay đổi; cần đối chiếu với phản hồi gốc của giảng viên trước khi nộp. |
+| GitHub Copilot (AI assistant trong VS Code) | Đọc và đối chiếu toàn bộ tài liệu Workshop Buổi 12 với repo; hỗ trợ hiện thực API CRUD an toàn cho phiếu/lịch hẹn, migration, test và tài liệu báo cáo | `src/services/ticket-l4.service.js`, `src/repositories/ticket.repository.js`, `src/services/appointment.service.js`, `src/repositories/appointment.repository.js`, `migrations/004_ticket_crud.sql`, `tests/`, README/docs | Đã rà soát mã nguồn; chạy `npm test`, `npm run test:l4`, `npm run build`; chạy migration và seed hai lần trên PostgreSQL local; kiểm thử CRUD phiếu/lịch hẹn thật qua PostgreSQL, gồm đóng/hủy mềm, rồi dọn các bản ghi kiểm thử. |
 
 **Cam kết:** Tôi xác nhận đã đọc, hiểu và chịu trách nhiệm về toàn bộ nội dung nộp.
 
-Họ tên: Nguyễn Ngô Ngọc Long · MSSV: 2374802010281 · Ngày: 19/10/2026
+Họ tên: Nguyễn Ngô Ngọc Long · MSSV: 2374802010281 · Ngày cập nhật: 30/10/2026

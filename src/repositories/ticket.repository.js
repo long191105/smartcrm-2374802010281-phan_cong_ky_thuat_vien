@@ -10,6 +10,77 @@ class TicketRepository {
     this.pool = pool;
   }
 
+  async createTicket({
+    ticketCode,
+    customerId,
+    productId,
+    serialNo,
+    centerCode,
+    categoryName,
+    priority,
+    issueDesc,
+    receivedAt,
+    dueDate,
+    isWarranty,
+    createdBy,
+  }) {
+    const client = await this.pool.connect();
+    let transactionStarted = false;
+
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+      const result = await client.query(
+        `INSERT INTO ticket (
+           ticket_code, customer_id, product_id, serial_no, center_code, category_name,
+           priority, status, issue_desc, received_at, due_date, is_warranty
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'MOI', $8, $9, $10, $11)
+         RETURNING ticket_id, ticket_code, customer_id, product_id, serial_no,
+                   center_code, category_name, priority, status, issue_desc,
+                   received_at, due_date, is_warranty`,
+        [
+          ticketCode,
+          customerId,
+          productId,
+          serialNo,
+          centerCode,
+          categoryName,
+          priority,
+          issueDesc || null,
+          receivedAt,
+          dueDate,
+          isWarranty,
+        ],
+      );
+      const ticket = result.rows[0];
+      await client.query(
+        `INSERT INTO ticket_status_log (ticket_id, from_status, to_status, changed_by, note)
+         VALUES ($1, NULL, 'MOI', $2, 'Tiếp nhận phiếu bảo hành.')`,
+        [ticket.ticket_id, createdBy],
+      );
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return ticket;
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Ticket creation failed and the database transaction could not be rolled back.',
+          );
+        }
+      }
+      if (error.code === '23505') {
+        throw new AppError(409, 'TICKET_CODE_EXISTS', 'Mã phiếu bảo hành đã tồn tại.');
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async list({ ticketCode, status, centerCode, categoryName, limit, offset }) {
     const values = [];
     const conditions = [];
@@ -75,6 +146,172 @@ class TicketRepository {
         .map(({ total, ...ticket }) => ticket),
       total: result.rows.length > 0 ? result.rows[0].total : 0,
     };
+  }
+
+  async getTicket(ticketCode) {
+    const result = await this.list({
+      ticketCode,
+      limit: 1,
+      offset: 0,
+    });
+    if (result.items.length === 0) {
+      throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy phiếu bảo hành.');
+    }
+    return result.items[0];
+  }
+
+  async updateTicket({ ticketCode, changes }) {
+    const editableColumns = {
+      customer_id: 'customer_id',
+      product_id: 'product_id',
+      serial_no: 'serial_no',
+      center_code: 'center_code',
+      category_name: 'category_name',
+      priority: 'priority',
+      issue_desc: 'issue_desc',
+      due_date: 'due_date',
+      is_warranty: 'is_warranty',
+    };
+    const entries = Object.entries(changes);
+    const values = entries.map(([, value]) => value);
+    const assignments = entries.map(([field], index) =>
+      `${editableColumns[field]} = $${index + 1}`);
+    const client = await this.pool.connect();
+    let transactionStarted = false;
+
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+      const ticketResult = await client.query(
+        `SELECT ticket_id, status, received_at
+         FROM ticket
+         WHERE ticket_code = $1
+         FOR UPDATE`,
+        [ticketCode],
+      );
+      const ticket = ticketResult.rows[0];
+      if (!ticket) {
+        throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy phiếu bảo hành.');
+      }
+      if (ticket.status !== 'MOI') {
+        throw new AppError(409, 'TICKET_NOT_EDITABLE', 'Chỉ phiếu mới chưa xử lý mới được chỉnh sửa.');
+      }
+      const assignmentResult = await client.query(
+        `SELECT 1 FROM ticket_assignment WHERE ticket_id = $1 LIMIT 1`,
+        [ticket.ticket_id],
+      );
+      if (assignmentResult.rowCount > 0) {
+        throw new AppError(409, 'TICKET_NOT_EDITABLE', 'Không thể chỉnh sửa phiếu đã có lịch sử phân công.');
+      }
+      if (changes.due_date && Date.parse(changes.due_date) < new Date(ticket.received_at).getTime()) {
+        throw new AppError(
+          422,
+          'VALIDATION_ERROR',
+          'Dữ liệu không hợp lệ.',
+          { due_date: 'Hạn cam kết phải bằng hoặc sau thời điểm tiếp nhận.' },
+        );
+      }
+
+      values.push(ticket.ticket_id);
+      const result = await client.query(
+        `UPDATE ticket
+         SET ${assignments.join(', ')}
+         WHERE ticket_id = $${values.length}
+         RETURNING ticket_id, ticket_code, customer_id, product_id, serial_no,
+                   center_code, category_name, priority, status, issue_desc,
+                   received_at, due_date, is_warranty`,
+        values,
+      );
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return result.rows[0];
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Ticket update failed and the database transaction could not be rolled back.',
+          );
+        }
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async closeTicket({ ticketCode, closedBy, note }) {
+    const client = await this.pool.connect();
+    let transactionStarted = false;
+
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+      const result = await client.query(
+        `SELECT ticket_id, status
+         FROM ticket
+         WHERE ticket_code = $1
+         FOR UPDATE`,
+        [ticketCode],
+      );
+      const ticket = result.rows[0];
+      if (!ticket) {
+        throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy phiếu bảo hành.');
+      }
+      if (ticket.status !== 'MOI') {
+        throw new AppError(409, 'TICKET_NOT_CLOSABLE', 'Chỉ phiếu mới chưa xử lý mới được đóng.');
+      }
+      const linkedRecords = await client.query(
+        `SELECT EXISTS (
+           SELECT 1 FROM ticket_assignment WHERE ticket_id = $1
+         ) OR EXISTS (
+           SELECT 1 FROM appointment WHERE ticket_id = $1
+         ) AS has_history`,
+        [ticket.ticket_id],
+      );
+      if (linkedRecords.rows[0].has_history) {
+        throw new AppError(
+          409,
+          'TICKET_HAS_HISTORY',
+          'Không thể đóng phiếu đã phát sinh phân công hoặc lịch hẹn.',
+        );
+      }
+
+      await client.query(
+        `UPDATE ticket
+         SET status = 'DA_DONG', closed_at = NOW()
+         WHERE ticket_id = $1`,
+        [ticket.ticket_id],
+      );
+      await client.query(
+        `INSERT INTO ticket_status_log (ticket_id, from_status, to_status, changed_by, note)
+         VALUES ($1, 'MOI', 'DA_DONG', $2, $3)`,
+        [ticket.ticket_id, closedBy, note],
+      );
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return {
+        ticket_code: ticketCode,
+        from_status: 'MOI',
+        status: 'DA_DONG',
+      };
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Ticket close failed and the database transaction could not be rolled back.',
+          );
+        }
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async getHistory(ticketCode) {

@@ -29,7 +29,7 @@ npm --version
 Mở PowerShell tại thư mục gốc dự án (thư mục có `package.json`), sau đó cài các package:
 
 ```powershell
-npm install
+npm ci
 ```
 
 Tạo file cấu hình riêng từ mẫu:
@@ -86,6 +86,8 @@ npm run seed
   sửa migration cũ.
 - `npm run seed` nạp fixture trong `seeds/`. Có thể chạy lại seed; các fixture demo được viết để
   tránh tạo trùng dữ liệu.
+- Có thể kiểm tra tính lặp lại bằng cách chạy lại cả hai lệnh trên. Migration dùng checksum và bỏ
+  qua tệp đã áp dụng; seed dùng `ON CONFLICT`/`NOT EXISTS` và transaction cho từng tệp.
 
 ### 3.3 Tạo tài khoản đăng nhập ban đầu
 
@@ -237,24 +239,21 @@ Vite ghi bản build vào `dist/`. Khi thư mục build tồn tại, Express ph�
 
 ## 7. Kiểm thử
 
-Chạy bộ kiểm thử L4 được cấu hình cho API, service, repository, schema, import dữ liệu và hợp đồng
-mapper:
-
-```powershell
-npm run test:l4
-```
-
-Chạy toàn bộ test Node.js:
+Chạy toàn bộ bộ kiểm thử bằng một lệnh:
 
 ```powershell
 npm test
 ```
 
-Các test cần database giả lập cho repository/API và không yêu cầu database PostgreSQL chạy. Test
-end-to-end với database thật cần PostgreSQL đã cấu hình và migrate trước. Hiện `npm test` còn chạy
-hai test L2 cũ đang import các module không có trong codebase (`src/services/ticket.service` và
-`src/validators/ticket.validator`), nên lệnh này chưa thể xanh toàn bộ. Dùng `npm run test:l4` để
-kiểm tra phạm vi L4; không xóa hoặc bỏ qua hai test cũ để che lỗi.
+Lệnh trên kiểm thử API, service/repository, kiểm tra đầu vào, schema/migration/seed, import dữ liệu và
+mapper giao diện. Có test luồng đúng, giá trị biên và dữ liệu sai. Có thể chạy riêng các kiểm thử L4:
+
+```powershell
+npm run test:l4
+```
+
+Các test dùng fixture/fake cho repository và API nên không yêu cầu PostgreSQL đang chạy. Để xác minh
+toàn bộ luồng với dữ liệu thật, cần PostgreSQL đã cấu hình, sau đó chạy migration và seed trước.
 
 ## 8. API chính
 
@@ -262,7 +261,8 @@ Base path là `/api`:
 
 | Method | Endpoint | Mục đích |
 |---|---|---|
-| `GET` | `/api/tickets` | Danh sách phiếu; hỗ trợ lọc trạng thái, trung tâm, nhóm sự cố, phân trang |
+| `GET/POST` | `/api/tickets` | Đọc danh sách và tiếp nhận phiếu mới |
+| `GET/PATCH/DELETE` | `/api/tickets/{ticket_code}` | Đọc, chỉnh sửa phiếu `MOI`, hoặc đóng phiếu an toàn |
 | `POST` | `/api/tickets/{ticket_code}/assignment` | Phân công phiếu đang chờ |
 | `GET` | `/api/tickets/{ticket_code}/history` | Lịch sử phân công và trạng thái |
 | `PATCH` | `/api/tickets/{ticket_code}/status` | Cập nhật trạng thái phiếu |
@@ -270,10 +270,13 @@ Base path là `/api`:
 | `GET` | `/api/technicians/{technician_code}/tickets` | Phiếu được giao cho kỹ thuật viên |
 | `GET` | `/api/appointments` | Xem lịch hẹn theo ngày/kỹ thuật viên |
 | `POST` | `/api/appointments` | Đặt lịch hẹn và kiểm tra trùng lịch |
+| `GET/PATCH/DELETE` | `/api/appointments/{appointment_id}` | Đọc, đổi lịch, hoặc hủy mềm lịch hẹn |
 
 Mã phiếu có dấu `/`, nên client phải URL-encode mã khi gọi endpoint có path parameter. Lỗi API có
 dạng `{ "error": "...", "message": "...", "fields": {} }`; dữ liệu đầu vào sai trả HTTP 422.
 Chi tiết request/response xem trong [`docs/api_contract.md`](./docs/api_contract.md).
+Thao tác DELETE giữ nguyên lịch sử: phiếu đủ điều kiện được chuyển sang `DA_DONG`, lịch hẹn được
+chuyển sang `KHACH_HUY`; hệ thống không xóa cứng bản ghi.
 
 ## 9. Cấu trúc thư mục cần biết
 

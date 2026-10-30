@@ -61,6 +61,9 @@ endpoint đăng ký công khai. Mật khẩu được lưu dưới dạng hash s
 | E6 | PATCH | `/api/tickets/{ticket_code}/status` | Chuyển trạng thái phiếu theo tiến trình | US5, FR10 |
 | E7 | GET | `/api/appointments?technician_code=KT002&date=2026-10-20` | Xem lịch theo kỹ thuật viên/ngày | US3, FR3 |
 | E8 | GET | `/api/tickets/{ticket_code}/history` | Xem lịch sử phân công/trạng thái | UC1, UC10 |
+| E9 | POST | `/api/tickets` | Tạo phiếu `MOI` từ mã nguồn L2 | FR11 |
+| E10 | GET/PATCH/DELETE | `/api/tickets/{ticket_code}` | Đọc, cập nhật hoặc đóng mềm phiếu | FR11 |
+| E11 | GET/PATCH/DELETE | `/api/appointments/{appointment_id}` | Đọc, đổi lịch hoặc hủy mềm lịch hẹn | FR12 |
 
 ## 3. Định dạng lỗi chung
 
@@ -267,6 +270,59 @@ Trả tối đa 100 lịch, sắp theo `start_at`.
 
 Trả lịch sử phân công và đổi trạng thái theo thứ tự mới nhất trước. Phiếu không tồn tại trả 404.
 
+## E9. POST /api/tickets
+
+Tạo phiếu ở trạng thái `MOI`. `ticket_code` do luồng nguồn L2 cung cấp; `customer_id` và
+`product_id` chỉ được lưu làm mã tham chiếu, không tra cứu hay tạo hồ sơ khách hàng/sản phẩm.
+`ticket_id` được cấp tự động; việc tạo phiếu và ghi sự kiện ban đầu vào `ticket_status_log` nằm
+trong cùng transaction.
+
+**Request**
+
+```json
+{
+  "ticket_code": "BH-900099/2025",
+  "customer_id": 14159,
+  "product_id": 21,
+  "serial_no": "SN541017338391",
+  "center_code": "TT04",
+  "category_name": "MAN_HINH",
+  "priority": "TRUNG_BINH",
+  "issue_desc": "Màn hình nhấp nháy",
+  "received_at": "2026-10-20T08:00:00+07:00",
+  "due_date": "2026-10-23T08:00:00+07:00",
+  "is_warranty": true,
+  "created_by": "manager"
+}
+```
+
+Trả `201` với bản ghi vừa tạo. Mã phiếu trùng trả `409 TICKET_CODE_EXISTS`; trường sai, serial sai
+định dạng hoặc hạn cam kết trước thời điểm tiếp nhận trả `422 VALIDATION_ERROR`.
+
+## E10. GET/PATCH/DELETE /api/tickets/{ticket_code}
+
+- `GET` trả thông tin phiếu; mã hợp lệ nhưng không tồn tại trả `404`.
+- `PATCH` nhận ít nhất một trường trong `customer_id`, `product_id`, `serial_no`, `center_code`,
+  `category_name`, `priority`, `issue_desc`, `due_date`, `is_warranty`. Chỉ phiếu `MOI` chưa từng
+  được phân công mới sửa được; trường trạng thái và thời điểm tiếp nhận không sửa qua endpoint này.
+- `DELETE` yêu cầu body `{ "closed_by": "manager", "note": "Tạo nhầm" }`. Đây là đóng mềm: chỉ phiếu
+  `MOI` chưa từng có phân công/lịch hẹn được chuyển sang `DA_DONG`, ghi `closed_at` và
+  `ticket_status_log`; bản ghi không bị xóa khỏi CSDL. Thành công trả `200` với `status: "DA_DONG"`.
+- Phiếu đang xử lý, đã có liên kết hoặc lịch sử không phù hợp trả lỗi `409`; request không hợp lệ trả
+  `422`.
+
+## E11. GET/PATCH/DELETE /api/appointments/{appointment_id}
+
+- `GET` trả chi tiết lịch hẹn; `appointment_id` phải là số nguyên dương.
+- `PATCH` nhận ít nhất một trường `appointment_type`, `scheduled_start`, `duration_minutes` hoặc
+  `note`. Chỉ lịch `DA_DAT`/`DA_XAC_NHAN` chỉnh sửa được; thời lượng vẫn phải trong 15–240 phút và
+  khung giờ không được trùng lịch của cùng kỹ thuật viên. Ràng buộc `EXCLUDE` trong PostgreSQL vẫn
+  là lớp bảo vệ cuối cùng khi có thao tác đồng thời.
+- `DELETE` hủy mềm lịch đang hoạt động bằng cách chuyển `status` sang `KHACH_HUY`; dữ liệu và liên
+  kết lịch sử được giữ lại. Lịch đã kết thúc/hủy không bị thay đổi. Thành công trả `200`.
+- Không tìm thấy lịch trả `404`; trạng thái không cho phép sửa/hủy hoặc lịch bị trùng trả `409`;
+  input không hợp lệ trả `422`.
+
 ## 4. Ánh xạ dữ liệu mẫu
 
 | CSV nguồn | Bảng/thuộc tính đích | Ghi chú |
@@ -294,3 +350,5 @@ trong phạm vi L4.
 | E6 PATCH ticket status | US5 | FR10 | UC10 |
 | E7 GET appointments | US3 | FR3 | UC3 |
 | E8 GET ticket history | US1, US5 | FR1, FR10 | UC1, UC10 |
+| E9–E10 ticket CRUD | – | FR11 | – |
+| E11 appointment CRUD | – | FR12 | – |

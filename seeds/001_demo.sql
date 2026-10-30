@@ -70,3 +70,12 @@ WHERE t.ticket_id BETWEEN 900001 AND 900026
     FROM ticket_status_log AS history
     WHERE history.ticket_id = t.ticket_id
   );
+
+SELECT setval(
+  'ticket_ticket_id_seq',
+  GREATEST(
+    COALESCE((SELECT MAX(ticket_id) FROM ticket), 0) + 1,
+    (SELECT last_value + CASE WHEN is_called THEN 1 ELSE 0 END FROM ticket_ticket_id_seq)
+  ),
+  FALSE
+);

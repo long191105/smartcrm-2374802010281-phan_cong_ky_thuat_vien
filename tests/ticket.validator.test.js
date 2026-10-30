@@ -1,45 +1,66 @@
-const test = require('node:test');
 const assert = require('node:assert/strict');
-const { validateReceive, validateStatus } =
-  require('../src/validators/ticket.validator');
+const test = require('node:test');
+const { TicketService } = require('../src/services/ticket-l4.service');
 
-const hopLe = {
-  customerId: 1, serialNo: 'SN-10293', productId: 5, centerId: 2,
-  categoryId: 1, priority: 'CAO', soldAt: '2026-06-01',
+const validTicket = {
+  ticket_code: 'BH-900099/2025',
+  customer_id: 14159,
+  product_id: 21,
+  serial_no: 'SN541017338391',
+  center_code: 'TT04',
+  category_name: 'MAN_HINH',
+  priority: 'CAO',
+  received_at: '2026-10-20T08:00:00+07:00',
+  due_date: '2026-10-21T08:00:00+07:00',
+  created_by: 'manager',
 };
 
-test('TV-01 du lieu hop le thi tra ve doi tuong da chuan hoa', () => {
-  const ra = validateReceive({ ...hopLe, serialNo: '  SN-10293  ' });
-  assert.equal(ra.serialNo, 'SN-10293');
-  assert.equal(ra.customerId, 1);
+function validationService() {
+  return new TicketService({
+    async createTicket() { assert.fail('invalid input must not reach the repository'); },
+    async updateTicket() { assert.fail('invalid input must not reach the repository'); },
+    async closeTicket() { assert.fail('invalid input must not reach the repository'); },
+  });
+}
+
+test('create validation rejects missing fields and identifies them', async () => {
+  await assert.rejects(
+    () => validationService().createTicket({ ticket_code: validTicket.ticket_code }),
+    (error) => error.code === 'VALIDATION_ERROR'
+      && Object.hasOwn(error.details, 'serial_no')
+      && Object.hasOwn(error.details, 'priority'),
+  );
 });
 
-test('TV-02 thieu truong bat buoc thi nem loi NEU RO ten truong', () => {
-  try {
-    validateReceive({ customerId: 1 });
-    assert.fail('phai nem loi');
-  } catch (e) {
-    assert.equal(e.code, 'DU_LIEU_KHONG_HOP_LE');
-    assert.match(e.message, /serialNo/);
-    const cacTruong = e.chiTiet.cac_truong.map(x => x.truong);
-    assert.ok(cacTruong.includes('serialNo'));
-    assert.ok(cacTruong.includes('priority'));
-  }
+test('create validation rejects unsafe serial identifiers', async () => {
+  await assert.rejects(
+    () => validationService().createTicket({ ...validTicket, serial_no: "SN' OR 1=1 --" }),
+    (error) => error.code === 'VALIDATION_ERROR'
+      && Object.hasOwn(error.details, 'serial_no'),
+  );
 });
 
-test('TV-03 serial co ky tu la thi bi tu choi', () => {
-  assert.throws(() => validateReceive({ ...hopLe, serialNo: "SN' OR 1=1 --" }),
-    { code: 'DU_LIEU_KHONG_HOP_LE' });
+test('create validation rejects invalid codes and datetime values', async () => {
+  await assert.rejects(
+    () => validationService().createTicket({
+      ...validTicket,
+      ticket_code: 'not-a-ticket',
+      received_at: '20/10/2026',
+    }),
+    (error) => error.code === 'VALIDATION_ERROR'
+      && Object.hasOwn(error.details, 'ticket_code')
+      && Object.hasOwn(error.details, 'received_at'),
+  );
 });
 
-test('TV-04 ngay ban sai dinh dang thi bi tu choi', () => {
-  assert.throws(() => validateReceive({ ...hopLe, soldAt: '01/06/2026' }),
-    { code: 'DU_LIEU_KHONG_HOP_LE' });
-});
-
-test('TV-05 trang thai ngoai tap cho phep thi bi tu choi', () => {
-  assert.throws(() => validateStatus({ status: 'XONG_ROI' }),
-    { code: 'DU_LIEU_KHONG_HOP_LE' });
-  assert.deepEqual(validateStatus({ status: 'DANG_SUA' }),
-    { status: 'DANG_SUA', note: null });
+test('update validation rejects empty or unsupported changes', async () => {
+  const service = validationService();
+  await assert.rejects(
+    () => service.updateTicket(validTicket.ticket_code, {}),
+    { code: 'VALIDATION_ERROR' },
+  );
+  await assert.rejects(
+    () => service.updateTicket(validTicket.ticket_code, { status: 'DA_DONG' }),
+    { code: 'VALIDATION_ERROR' },
+  );
 });

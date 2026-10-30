@@ -18,6 +18,30 @@ class AppointmentController {
       next(error);
     }
   };
+
+  get = async (req, res, next) => {
+    try {
+      res.json(await this.service.get(req.params.appointmentId));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  update = async (req, res, next) => {
+    try {
+      res.json(await this.service.update(req.params.appointmentId, req.body));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  cancel = async (req, res, next) => {
+    try {
+      res.json(await this.service.cancel(req.params.appointmentId));
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 module.exports = { AppointmentController };
