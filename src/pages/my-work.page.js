@@ -27,18 +27,18 @@ export async function mountMyWorkPage(root, routeParams = {}) {
   let selectedTicket = null;
   let onlyOpen = true;
   let feedback = '';
-  let completedTicket = null;
+  let updatedTicket = null;
 
   function render() {
     const allTickets = tickets.data?.items || [];
     const shown = allTickets.filter((ticket) => !onlyOpen || OPEN_STATUSES.has(ticket.status));
     const techItems = technicians.data?.items || [];
     root.innerHTML = `
-      ${feedback ? `<div class="notice" role="status">${escapeHtml(feedback)}${completedTicket ? `
-        <a class="button button-primary workflow-next" href="#assign">Quy trình hoàn tất · Tiếp tục phiếu khác</a>` : ''}</div>` : ''}
+      ${feedback ? `<div class="notice" role="status">${escapeHtml(feedback)}${updatedTicket ? `
+        <a class="button button-primary workflow-next" href="#assign">${updatedTicket.status === 'HOAN_TAT' ? 'Phiếu đã hoàn tất · ' : ''}Quay lại M1: chọn phiếu khác</a>` : ''}</div>` : ''}
       <section class="panel">
-        <div class="section-heading"><div><h2>Kỹ thuật viên</h2><p>Chọn danh tính kỹ thuật viên trong dữ liệu đã nạp.</p></div>
-          <label>Người phụ trách<select data-role="technician" ${technicians.state !== 'ready' ? 'disabled' : ''}>
+        <div class="section-heading"><div><h2>Danh tính kỹ thuật viên</h2><p>Prototype chưa liên kết tài khoản đăng nhập với kỹ thuật viên; chọn mã để mô phỏng người đang xem công việc.</p></div>
+          <label>Đang xem công việc của<select data-role="technician" ${technicians.state !== 'ready' ? 'disabled' : ''}>
             <option value="">Chọn kỹ thuật viên</option>
             ${techItems.map((tech) => `<option value="${escapeHtml(tech.technician_code)}" ${technicianCode === tech.technician_code ? 'selected' : ''}>${escapeHtml(tech.full_name)} · ${escapeHtml(tech.technician_code)} · ${tech.open_tickets} phiếu</option>`).join('')}
           </select></label></div>
@@ -100,9 +100,7 @@ export async function mountMyWorkPage(root, routeParams = {}) {
     render();
   }
 
-  async function selectTicket(code) {
-    const raw = tickets.data.items.find((ticket) => ticket.ticket_code === code);
-    selectedTicket = raw ? toTicketView(raw) : null;
+  async function loadHistory(code) {
     history = { state: 'loading', data: { items: [] } };
     render();
     try {
@@ -114,11 +112,17 @@ export async function mountMyWorkPage(root, routeParams = {}) {
     render();
   }
 
+  async function selectTicket(code) {
+    const raw = tickets.data.items.find((ticket) => ticket.ticket_code === code);
+    selectedTicket = raw ? toTicketView(raw) : null;
+    await loadHistory(code);
+  }
+
   root.addEventListener('change', async (event) => {
     if (event.target.matches('[data-role="technician"]')) {
       technicianCode = event.target.value;
       selectedTicket = null;
-      completedTicket = null;
+      updatedTicket = null;
       feedback = '';
       if (technicianCode) await loadTickets();
       else render();
@@ -143,7 +147,7 @@ export async function mountMyWorkPage(root, routeParams = {}) {
       return render();
     }
     if (button.dataset.action === 'select-ticket') {
-      completedTicket = null;
+      updatedTicket = null;
       feedback = '';
       return selectTicket(button.dataset.code);
     }
@@ -153,17 +157,19 @@ export async function mountMyWorkPage(root, routeParams = {}) {
     event.preventDefault();
     const values = new FormData(event.target);
     try {
-      const completedCode = selectedTicket.ticketCode;
+      const ticketCode = selectedTicket.ticketCode;
       const nextStatus = String(values.get('status'));
-      await ticketsApi.updateStatus(selectedTicket.ticketCode, {
+      await ticketsApi.updateStatus(ticketCode, {
         status: nextStatus,
         changed_by: technicianCode,
         note: String(values.get('note') || '').trim(),
       });
-      feedback = `Đã cập nhật phiếu ${completedCode} sang ${nextStatus}.`;
-      completedTicket = { ticketCode: completedCode, status: nextStatus };
-      selectedTicket = null;
+      feedback = `Đã cập nhật phiếu ${ticketCode} sang ${nextStatus}.`;
+      updatedTicket = { ticketCode, status: nextStatus };
+      selectedTicket = { ...selectedTicket, status: nextStatus };
+      if (!OPEN_STATUSES.has(nextStatus)) onlyOpen = false;
       await loadTickets();
+      await loadHistory(ticketCode);
     } catch (error) {
       feedback = error.message;
       render();

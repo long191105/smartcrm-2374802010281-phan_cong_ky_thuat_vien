@@ -137,6 +137,13 @@ viên ở M3 → cập nhật trạng thái. Mã phiếu được truyền qua b
 không phụ thuộc phiếu nằm ở trang phân trang nào. Sau khi cập nhật, có thể quay lại M1 để xử lý phiếu
 tiếp theo.
 
+Ở M3, prototype yêu cầu chọn mã kỹ thuật viên để mô phỏng danh tính xem danh sách công việc; lựa chọn
+này chưa được liên kết với tài khoản đăng nhập. Cập nhật sang `DANG_XU_LY` chỉ có nghĩa là bắt đầu
+xử lý, không phải phiếu đã hoàn tất. Phiếu chỉ kết thúc khi chuyển sang `HOAN_TAT`; sau mỗi lần cập
+nhật, màn hình giữ phiếu đang xem và tải lại lịch sử để người dùng xác nhận kết quả. Ngày giờ trong
+giao diện dùng múi giờ Việt Nam; lịch hẹn được nhập và lưu theo UTC+07:00, còn thời điểm đọc được
+hiển thị thống nhất theo `dd/MM/yyyy HH:mm`.
+
 ### 3.6 Dừng ứng dụng
 
 - Backend và Vite: nhấn `Ctrl+C` trong từng terminal.

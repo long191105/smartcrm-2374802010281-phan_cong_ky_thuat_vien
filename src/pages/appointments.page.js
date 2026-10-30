@@ -5,6 +5,11 @@ import { DataState } from '../components/DataState.js';
 import { escapeHtml, formatDate } from '../components/html.js';
 import { Pagination } from '../components/Pagination.js';
 import { toTicketView } from '../api/ticket-view.mjs';
+import {
+  addMinutesToVietnamDateTimeLocalValue,
+  defaultVietnamDateTimeLocalValue,
+  fromVietnamDateTimeLocalValue,
+} from '../components/date-time.mjs';
 
 const TICKET_PAGE_SIZE = 100;
 
@@ -89,8 +94,8 @@ export async function mountAppointmentsPage(root, routeParams = {}) {
             </span>
           </div>
           <label>Trạng thái<div class="detail-value">${Badge('DA_DAT')}</div></label>
-          <label>Bắt đầu<input name="scheduled_start" type="datetime-local" value="${escapeHtml(appointmentStart)}" required></label>
-          <label>Kết thúc<input data-role="end-time" type="datetime-local" value="${escapeHtml(addMinutes(appointmentStart, duration))}" readonly></label>
+          <label>Bắt đầu · giờ Việt Nam<input name="scheduled_start" type="datetime-local" value="${escapeHtml(appointmentStart)}" required></label>
+          <label>Kết thúc · giờ Việt Nam<input data-role="end-time" type="datetime-local" value="${escapeHtml(addMinutesToVietnamDateTimeLocalValue(appointmentStart, duration))}" readonly></label>
           <label class="appointment-note">Ghi chú<input name="note" maxlength="255" placeholder="Thông tin cần lưu ý"></label>
           <label>Thời lượng<select name="duration_minutes"><option value="30">30 phút</option><option value="60">60 phút</option><option value="90">90 phút</option><option value="120">120 phút</option></select></label>
           <div class="appointment-notice state-panel" data-role="conflict"><strong>E3</strong><span>Thời gian được kiểm tra với lịch của kỹ thuật viên trước khi lưu.</span></div>
@@ -213,8 +218,8 @@ export async function mountAppointmentsPage(root, routeParams = {}) {
     if (event.target.dataset.form !== 'appointment') return;
     event.preventDefault();
     const values = new FormData(event.target);
-    const localDate = new Date(String(values.get('scheduled_start')));
-    if (Number.isNaN(localDate.getTime())) {
+    const scheduledStart = fromVietnamDateTimeLocalValue(String(values.get('scheduled_start')));
+    if (!scheduledStart) {
       feedback = 'Vui lòng nhập thời gian bắt đầu hợp lệ.';
       render();
       return;
@@ -223,7 +228,7 @@ export async function mountAppointmentsPage(root, routeParams = {}) {
       const created = await appointmentsApi.create({
         ticket_code: selected.ticketCode,
         appointment_type: String(values.get('appointment_type')),
-        scheduled_start: localDate.toISOString(),
+        scheduled_start: scheduledStart.toISOString(),
         duration_minutes: Number(values.get('duration_minutes')),
         note: String(values.get('note') || '').trim(),
       });
@@ -253,26 +258,9 @@ function updateEndTime(root, durationMinutes) {
     if (end) end.value = '';
     return;
   }
-  const date = new Date(start.value);
-  if (Number.isNaN(date.getTime())) {
-    end.value = '';
-    return;
-  }
-  date.setMinutes(date.getMinutes() + durationMinutes);
-  const localValue = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  end.value = localValue.toISOString().slice(0, 16);
+  end.value = addMinutesToVietnamDateTimeLocalValue(start.value, durationMinutes);
 }
 
 function defaultAppointmentTime() {
-  const date = new Date();
-  date.setMinutes(Math.ceil((date.getMinutes() + 15) / 15) * 15, 0, 0);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
-
-function addMinutes(value, minutes) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  date.setMinutes(date.getMinutes() + minutes);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  return defaultVietnamDateTimeLocalValue();
 }
