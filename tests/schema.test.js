@@ -6,6 +6,10 @@ const test = require('node:test');
 const root = path.join(__dirname, '..');
 const schema = fs.readFileSync(path.join(root, 'migrations', '001_init.sql'), 'utf8');
 const indexes = fs.readFileSync(path.join(root, 'migrations', '002_tickets.sql'), 'utf8');
+const ticketCrudMigration = fs.readFileSync(
+  path.join(root, 'migrations', '004_ticket_crud.sql'),
+  'utf8',
+);
 const seed = fs.readFileSync(path.join(root, 'seeds', '001_demo.sql'), 'utf8');
 
 test('L4 schema creates exactly six business entities', () => {
@@ -23,6 +27,7 @@ test('L4 schema creates exactly six business entities', () => {
   assert.doesNotMatch(schema, /CREATE TABLE IF NOT EXISTS\s+(service_center|issue_category)\b/i);
   assert.match(indexes, /uq_assignment_current/);
   assert.match(schema, /ex_appointment_no_overlap/);
+  assert.match(ticketCrudMigration, /ALTER COLUMN ticket_id SET DEFAULT nextval/);
 });
 
 test('schema uses dataset values and preserves the half-open appointment overlap rule', () => {

@@ -24,6 +24,14 @@ const createSchema = z.object({
   duration_minutes: z.number().int().min(15).max(240),
   note: z.string().trim().max(255).optional().default(''),
 });
+const appointmentIdSchema = z.string().regex(/^[1-9]\d*$/).transform(Number)
+  .refine(Number.isSafeInteger);
+const updateSchema = z.object({
+  appointment_type: z.enum(['GIAO_MAY', 'NHAN_MAY', 'KIEM_TRA_TAI_CHO']).optional(),
+  scheduled_start: z.string().datetime({ offset: true }).optional(),
+  duration_minutes: z.number().int().min(15).max(240).optional(),
+  note: z.string().trim().max(255).optional(),
+}).refine((input) => Object.keys(input).length > 0, 'Cần ít nhất một trường để cập nhật.');
 
 class AppointmentService {
   constructor(repository) {
@@ -47,6 +55,28 @@ class AppointmentService {
       durationMinutes: input.duration_minutes,
       note: input.note,
     });
+  }
+
+  async get(appointmentId) {
+    const id = validate(appointmentIdSchema, appointmentId);
+    return this.repository.get(id);
+  }
+
+  async update(appointmentId, body) {
+    const id = validate(appointmentIdSchema, appointmentId);
+    const input = validate(updateSchema, body);
+    return this.repository.update({
+      appointmentId: id,
+      appointmentType: input.appointment_type,
+      startAt: input.scheduled_start,
+      durationMinutes: input.duration_minutes,
+      note: input.note,
+    });
+  }
+
+  async cancel(appointmentId) {
+    const id = validate(appointmentIdSchema, appointmentId);
+    return this.repository.cancel(id);
   }
 }
 

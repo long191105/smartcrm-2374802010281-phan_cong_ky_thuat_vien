@@ -5,6 +5,25 @@ class AppointmentRepository {
     this.pool = pool;
   }
 
+  async get(appointmentId) {
+    const result = await this.pool.query(
+      `SELECT appointment.appointment_id, ticket.ticket_code,
+              technician.technician_code, technician.full_name,
+              appointment.center_code, appointment.appointment_type,
+              appointment.start_at, appointment.end_at, appointment.status,
+              appointment.note
+       FROM appointment
+       JOIN ticket ON ticket.ticket_id = appointment.ticket_id
+       JOIN technician ON technician.technician_id = appointment.technician_id
+       WHERE appointment.appointment_id = $1`,
+      [appointmentId],
+    );
+    if (result.rowCount === 0) {
+      throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy lịch hẹn.');
+    }
+    return result.rows[0];
+  }
+
   async list({ technicianCode, date }) {
     const values = [];
     const conditions = [];
@@ -128,6 +147,142 @@ class AppointmentRepository {
           'APPOINTMENT_CONFLICT',
           'Khung giờ vừa được đặt bởi thao tác khác. Vui lòng chọn giờ khác.',
         );
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async update({ appointmentId, appointmentType, startAt, durationMinutes, note }) {
+    const client = await this.pool.connect();
+    let transactionStarted = false;
+
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+      const currentResult = await client.query(
+        `SELECT appointment_id, technician_id, start_at, end_at, appointment_type,
+                status, note
+         FROM appointment
+         WHERE appointment_id = $1
+         FOR UPDATE`,
+        [appointmentId],
+      );
+      const current = currentResult.rows[0];
+      if (!current) {
+        throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy lịch hẹn.');
+      }
+      if (!['DA_DAT', 'DA_XAC_NHAN'].includes(current.status)) {
+        throw new AppError(409, 'APPOINTMENT_NOT_EDITABLE', 'Chỉ lịch đang hoạt động mới được chỉnh sửa.');
+      }
+
+      const resolvedStart = startAt ? new Date(startAt) : new Date(current.start_at);
+      const currentDuration = (new Date(current.end_at).getTime()
+        - new Date(current.start_at).getTime()) / 60_000;
+      const resolvedDuration = durationMinutes ?? currentDuration;
+      const resolvedEnd = new Date(resolvedStart.getTime() + resolvedDuration * 60_000);
+      const conflict = await client.query(
+        `SELECT appointment_id, start_at, end_at
+         FROM appointment
+         WHERE technician_id = $1
+           AND appointment_id <> $2
+           AND status IN ('DA_DAT', 'DA_XAC_NHAN')
+           AND start_at < $4
+           AND end_at > $3
+         ORDER BY start_at
+         LIMIT 1
+         FOR UPDATE`,
+        [current.technician_id, appointmentId, resolvedStart, resolvedEnd],
+      );
+      if (conflict.rowCount > 0) {
+        throw new AppError(
+          409,
+          'APPOINTMENT_CONFLICT',
+          'Khung giờ đã trùng với lịch hẹn của kỹ thuật viên.',
+          { scheduled_start: conflict.rows[0].start_at },
+        );
+      }
+
+      await client.query(
+        `UPDATE appointment
+         SET appointment_type = $2, start_at = $3, end_at = $4, note = $5
+         WHERE appointment_id = $1`,
+        [
+          appointmentId,
+          appointmentType || current.appointment_type,
+          resolvedStart,
+          resolvedEnd,
+          note === undefined ? current.note : note || null,
+        ],
+      );
+      await client.query('COMMIT');
+      transactionStarted = false;
+      const updated = await this.get(appointmentId);
+      return updated;
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Appointment update failed and the database transaction could not be rolled back.',
+          );
+        }
+      }
+      if (error.code === '23P01') {
+        throw new AppError(
+          409,
+          'APPOINTMENT_CONFLICT',
+          'Khung giờ vừa được đặt bởi thao tác khác. Vui lòng chọn giờ khác.',
+        );
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async cancel(appointmentId) {
+    const client = await this.pool.connect();
+    let transactionStarted = false;
+
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+      const result = await client.query(
+        `SELECT appointment_id, status
+         FROM appointment
+         WHERE appointment_id = $1
+         FOR UPDATE`,
+        [appointmentId],
+      );
+      const appointment = result.rows[0];
+      if (!appointment) {
+        throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy lịch hẹn.');
+      }
+      if (!['DA_DAT', 'DA_XAC_NHAN'].includes(appointment.status)) {
+        throw new AppError(409, 'APPOINTMENT_NOT_CANCELLABLE', 'Lịch hẹn không còn ở trạng thái có thể hủy.');
+      }
+
+      await client.query(
+        `UPDATE appointment SET status = 'KHACH_HUY' WHERE appointment_id = $1`,
+        [appointmentId],
+      );
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return { appointment_id: appointmentId, status: 'KHACH_HUY' };
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Appointment cancellation failed and the database transaction could not be rolled back.',
+          );
+        }
       }
       throw error;
     } finally {

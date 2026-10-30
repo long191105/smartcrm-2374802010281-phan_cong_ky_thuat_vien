@@ -32,9 +32,25 @@ before(async () => {
     },
   };
   const ticketService = {
+    async createTicket(body) {
+      ticketServiceCalls.push({ method: 'ticket-create', body });
+      return { ticket_code: body.ticket_code, status: 'MOI' };
+    },
     async listTickets(query) {
       ticketServiceCalls.push({ method: 'list', query });
       return { items: [], total: 0 };
+    },
+    async getTicket(ticketCode) {
+      ticketServiceCalls.push({ method: 'ticket-get', ticketCode });
+      return { ticket_code: ticketCode, status: 'MOI' };
+    },
+    async updateTicket(ticketCode, body) {
+      ticketServiceCalls.push({ method: 'ticket-update', ticketCode, body });
+      return { ticket_code: ticketCode, ...body };
+    },
+    async closeTicket(ticketCode, body) {
+      ticketServiceCalls.push({ method: 'ticket-close', ticketCode, body });
+      return { ticket_code: ticketCode, status: 'DA_DONG' };
     },
     async assignTicket(ticketCode, body) {
       ticketServiceCalls.push({ method: 'assign', ticketCode, body });
@@ -69,6 +85,18 @@ before(async () => {
     async create(body) {
       ticketServiceCalls.push({ method: 'appointment-create', body });
       return { appointment_id: 1, ...body };
+    },
+    async get(appointmentId) {
+      ticketServiceCalls.push({ method: 'appointment-get', appointmentId });
+      return { appointment_id: Number(appointmentId), status: 'DA_DAT' };
+    },
+    async update(appointmentId, body) {
+      ticketServiceCalls.push({ method: 'appointment-update', appointmentId, body });
+      return { appointment_id: Number(appointmentId), ...body };
+    },
+    async cancel(appointmentId) {
+      ticketServiceCalls.push({ method: 'appointment-cancel', appointmentId });
+      return { appointment_id: Number(appointmentId), status: 'KHACH_HUY' };
     },
   };
   server = createApp({
@@ -198,6 +226,42 @@ test('GET /api/tickets forwards filters and returns the list contract', async ()
     headers: sessionHeaders,
   });
 
+  test('ticket collection and item routes expose create, read, update, and safe close operations', async () => {
+    const created = await fetch(`${baseUrl}/api/tickets`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...sessionHeaders },
+      body: JSON.stringify({ ticket_code: 'BH-900099/2025' }),
+    });
+    assert.equal(created.status, 201);
+    assert.deepEqual(await created.json(), {
+      ticket_code: 'BH-900099/2025',
+      status: 'MOI',
+    });
+    assert.equal(ticketServiceCalls.at(-1).method, 'ticket-create');
+
+    const code = encodeURIComponent('BH-900099/2025');
+    const read = await fetch(`${baseUrl}/api/tickets/${code}`, { headers: sessionHeaders });
+    assert.equal(read.status, 200);
+    assert.deepEqual(await read.json(), { ticket_code: 'BH-900099/2025', status: 'MOI' });
+
+    const updated = await fetch(`${baseUrl}/api/tickets/${code}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...sessionHeaders },
+      body: JSON.stringify({ priority: 'CAO' }),
+    });
+    assert.equal(updated.status, 200);
+    assert.deepEqual(await updated.json(), { ticket_code: 'BH-900099/2025', priority: 'CAO' });
+
+    const closed = await fetch(`${baseUrl}/api/tickets/${code}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json', ...sessionHeaders },
+      body: JSON.stringify({ closed_by: 'manager' }),
+    });
+    assert.equal(closed.status, 200);
+    assert.deepEqual(await closed.json(), { ticket_code: 'BH-900099/2025', status: 'DA_DONG' });
+    assert.equal(ticketServiceCalls.at(-1).method, 'ticket-close');
+  });
+
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { items: [], total: 0 });
   assert.deepEqual(ticketServiceCalls.at(-1), {
@@ -260,6 +324,19 @@ test('assignment input errors use the documented JSON error format', async () =>
       message: 'Dữ liệu không hợp lệ.',
       fields: { ticket_code: 'Mã phiếu không hợp lệ.' },
     });
+
+    const invalidCreate = await fetch(
+      `http://127.0.0.1:${validationServer.address().port}/api/tickets`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...sessionHeaders },
+        body: JSON.stringify({}),
+      },
+    );
+    assert.equal(invalidCreate.status, 422);
+    const createError = await invalidCreate.json();
+    assert.equal(createError.error, 'VALIDATION_ERROR');
+    assert.ok(Object.hasOwn(createError.fields, 'ticket_code'));
   } finally {
     await new Promise((resolve, reject) => {
       validationServer.close((error) => (error ? reject(error) : resolve()));
@@ -295,5 +372,27 @@ test('technician, assigned-work and appointment endpoints use live service contr
   assert.deepEqual(ticketServiceCalls.at(-1), {
     method: 'appointments',
     query: { date: '2026-10-20' },
+  });
+
+  const appointment = await fetch(`${baseUrl}/api/appointments/8`, { headers: sessionHeaders });
+  assert.equal(appointment.status, 200);
+  assert.deepEqual(await appointment.json(), { appointment_id: 8, status: 'DA_DAT' });
+
+  const updatedAppointment = await fetch(`${baseUrl}/api/appointments/8`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...sessionHeaders },
+    body: JSON.stringify({ note: 'Gọi trước khi đến' }),
+  });
+  assert.equal(updatedAppointment.status, 200);
+  assert.equal(ticketServiceCalls.at(-1).method, 'appointment-update');
+
+  const cancelledAppointment = await fetch(`${baseUrl}/api/appointments/8`, {
+    method: 'DELETE',
+    headers: sessionHeaders,
+  });
+  assert.equal(cancelledAppointment.status, 200);
+  assert.deepEqual(await cancelledAppointment.json(), {
+    appointment_id: 8,
+    status: 'KHACH_HUY',
   });
 });

@@ -9,6 +9,9 @@ function createAppointmentRoutes({ pool, service } = {}) {
   const router = express.Router();
   router.get('/', controller.list);
   router.post('/', controller.create);
+  router.get('/:appointmentId', controller.get);
+  router.patch('/:appointmentId', controller.update);
+  router.delete('/:appointmentId', controller.cancel);
   return router;
 }
 

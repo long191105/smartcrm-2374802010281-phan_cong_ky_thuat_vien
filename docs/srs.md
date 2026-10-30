@@ -15,9 +15,9 @@
 Tài liệu mô tả yêu cầu cho chức năng phân công kỹ thuật viên cho phiếu bảo hành và đặt lịch hẹn giao – nhận máy tại trung tâm bảo hành.
 
 ### 1.2 Phạm vi
-Hệ thống cho **quản lý trung tâm** phân công kỹ thuật viên cho phiếu bảo hành theo tay nghề, địa bàn và khối lượng công việc, đồng thời đặt lịch hẹn giao – nhận máy không trùng lịch.
+Hệ thống cho **quản lý trung tâm** quản lý phiếu bảo hành ở trạng thái chờ, phân công kỹ thuật viên theo tay nghề, địa bàn và khối lượng công việc, đồng thời quản lý lịch hẹn giao – nhận máy không trùng lịch. Track SE cung cấp API CRUD cho `ticket` và `appointment`; thao tác xóa được thực hiện như đóng/hủy mềm để bảo toàn lịch sử.
 
-**Ngoài phạm vi:** tạo và nhập phiếu bảo hành (luồng L2, giả định đã có), tối ưu tuyến đường di chuyển (US9 – WON'T), thanh toán.
+**Giới hạn:** API tạo phiếu chỉ lưu mã khách hàng/sản phẩm tham chiếu do luồng L2 cung cấp; không tạo hồ sơ khách hàng, sản phẩm hay tích hợp nhận phiếu từ L2. Tối ưu tuyến đường di chuyển (US9 – WON'T) và thanh toán ngoài phạm vi.
 
 ### 1.3 Bảng thuật ngữ
 Toàn bộ tài liệu, sơ đồ Use Case, API và cơ sở dữ liệu dùng một tên cho mỗi khái niệm. Mã phiếu
@@ -99,6 +99,8 @@ không xuất hiện trong sơ đồ phạm vi BT2.
 | UC8 | Phân công lại kỹ thuật viên | Quản lý trung tâm | `<<extend>>` của UC1 |
 | UC9 | Cảnh báo phiếu sắp quá hạn cam kết | Hệ thống thời gian, Quản lý trung tâm | |
 | UC10 | Cập nhật trạng thái phiếu | Kỹ thuật viên | SHOULD |
+| UC11 | Quản lý vòng đời phiếu theo Track SE | Quản lý trung tâm | CRUD giới hạn; đóng mềm để giữ lịch sử |
+| UC12 | Quản lý vòng đời lịch hẹn theo Track SE | Quản lý trung tâm | CRUD giới hạn; hủy mềm để giữ lịch sử |
 
 UC7 (khách hàng xác nhận lịch hẹn) được giữ trong backlog, không thuộc prototype BT2.
 
@@ -115,6 +117,8 @@ UC7 (khách hàng xác nhận lịch hẹn) được giữ trong backlog, không
 | US7 | Khách hàng xác nhận lịch hẹn | COULD — backlog |
 | US8 | Quản lý phân công lại phiếu và lưu lịch sử người phụ trách | COULD |
 | US9 | Tối ưu tuyến đường di chuyển | WON'T |
+| US10 | Quản lý phiếu mới chưa phân công qua API | MUST (Track SE) |
+| US11 | Quản lý lịch hẹn qua API | MUST (Track SE) |
 
 ---
 
@@ -134,6 +138,8 @@ UC7 (khách hàng xác nhận lịch hẹn) được giữ trong backlog, không
 | FR8 | Khách hàng xác nhận lịch hẹn. | COULD — backlog, chưa hiện thực trong BT2 |
 | FR9 | Quản lý phân công lại phiếu sang kỹ thuật viên khác và lưu lịch sử người phụ trách cũ. | COULD |
 | FR10 | Kỹ thuật viên cập nhật trạng thái phiếu theo các chuyển trạng thái hợp lệ và hệ thống ghi vào `ticket_status_log`. | SHOULD |
+| FR11 | Quản lý tạo, đọc, cập nhật phiếu `MOI` chưa xử lý và đóng mềm phiếu đủ điều kiện; mọi thao tác ghi được xác thực và dữ liệu đầu vào được kiểm tra. | MUST (Track SE) |
+| FR12 | Quản lý đọc, cập nhật và hủy mềm lịch hẹn đang hoạt động; quy tắc thời lượng và không trùng lịch luôn được áp dụng. | MUST (Track SE) |
 
 ### 3.2 Đặc tả use case quan trọng nhất: UC1 – Phân công kỹ thuật viên cho phiếu bảo hành
 
@@ -239,6 +245,8 @@ Các giá trị trên là đề xuất của nhóm cho phạm vi học phần.
 | FR8 | US7 | Backlog (UC7) | COULD – chưa hiện thực |
 | FR9 | US8 | UC8 | COULD |
 | FR10 | US5 | UC10 | SHOULD |
+| FR11 | US10 | UC11 | MUST (Track SE) |
+| FR12 | US11 | UC12 | MUST (Track SE) |
 
 | Màn wireframe | Phạm vi FR | Use Case |
 |---|---|---|
@@ -246,5 +254,5 @@ Các giá trị trên là đề xuất của nhóm cho phạm vi học phần.
 | M2 – Đặt lịch hẹn | FR3 | UC3, UC4 |
 | M3 – Công việc của tôi | FR6, FR10 | UC6, UC10 |
 
-Kiểm tra ngược: US1–US6 và US8 có FR trong phạm vi; US7 ở backlog, US9 là WON'T. NFR1 truy vết
-tới FR5, NFR2 tới FR3, NFR3 tới FR1, NFR4 tới FR7.
+Kiểm tra ngược: US1–US6, US8, US10 và US11 có FR trong phạm vi; US7 ở backlog, US9 là WON'T.
+NFR1 truy vết tới FR5, NFR2 tới FR3, NFR3 tới FR1, NFR4 tới FR7.

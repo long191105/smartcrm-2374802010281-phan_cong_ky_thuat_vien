@@ -38,9 +38,68 @@ const statusSchema = z.object({
   changed_by: z.string().regex(/^KT\d{3}$/, 'Phải là mã kỹ thuật viên dạng KT và 3 chữ số.'),
   note: z.string().trim().max(255).optional().default(''),
 });
+const ticketInputSchema = z.object({
+  ticket_code: z.string().regex(/^BH-\d{6}\/\d{4}$/),
+  customer_id: z.number().int().positive(),
+  product_id: z.number().int().positive(),
+  serial_no: z.string().trim().regex(/^[A-Za-z0-9-]{6,50}$/),
+  center_code: z.string().regex(/^TT\d{2}$/),
+  category_name: z.enum(CATEGORY_NAMES),
+  priority: z.enum(['CAO', 'TRUNG_BINH', 'THAP']),
+  issue_desc: z.string().trim().max(2000).optional().default(''),
+  received_at: z.string().datetime({ offset: true }),
+  due_date: z.string().datetime({ offset: true }),
+  is_warranty: z.boolean().default(true),
+  created_by: z.string().trim().min(1).max(100),
+}).superRefine((input, context) => {
+  if (Date.parse(input.due_date) < Date.parse(input.received_at)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['due_date'],
+      message: 'Hạn cam kết phải bằng hoặc sau thời điểm tiếp nhận.',
+    });
+  }
+});
+const ticketUpdateFields = {
+  customer_id: z.number().int().positive(),
+  product_id: z.number().int().positive(),
+  serial_no: z.string().trim().regex(/^[A-Za-z0-9-]{6,50}$/),
+  center_code: z.string().regex(/^TT\d{2}$/),
+  category_name: z.enum(CATEGORY_NAMES),
+  priority: z.enum(['CAO', 'TRUNG_BINH', 'THAP']),
+  issue_desc: z.string().trim().max(2000),
+  due_date: z.string().datetime({ offset: true }),
+  is_warranty: z.boolean(),
+};
+const ticketUpdateSchema = z.object(ticketUpdateFields).partial().refine(
+  (input) => Object.keys(input).length > 0,
+  'Cần ít nhất một trường để cập nhật.',
+);
+const closeTicketSchema = z.object({
+  closed_by: z.string().trim().min(1).max(100),
+  note: z.string().trim().max(255).optional().default('Đóng phiếu theo yêu cầu.'),
+});
 class TicketService {
   constructor(ticketRepository) {
     this.ticketRepository = ticketRepository;
+  }
+
+  async createTicket(body) {
+    const input = validate(ticketInputSchema, body);
+    return this.ticketRepository.createTicket({
+      ticketCode: input.ticket_code,
+      customerId: input.customer_id,
+      productId: input.product_id,
+      serialNo: input.serial_no,
+      centerCode: input.center_code,
+      categoryName: input.category_name,
+      priority: input.priority,
+      issueDesc: input.issue_desc,
+      receivedAt: input.received_at,
+      dueDate: input.due_date,
+      isWarranty: input.is_warranty,
+      createdBy: input.created_by,
+    });
   }
 
   async listTickets(query) {
@@ -52,6 +111,30 @@ class TicketService {
       categoryName: input.category_name,
       limit: input.limit,
       offset: input.offset,
+    });
+  }
+
+  async getTicket(ticketCode) {
+    const code = validate(ticketCodeSchema, { ticket_code: ticketCode }).ticket_code;
+    return this.ticketRepository.getTicket(code);
+  }
+
+  async updateTicket(ticketCode, body) {
+    const code = validate(ticketCodeSchema, { ticket_code: ticketCode }).ticket_code;
+    const input = validate(ticketUpdateSchema, body);
+    return this.ticketRepository.updateTicket({
+      ticketCode: code,
+      changes: input,
+    });
+  }
+
+  async closeTicket(ticketCode, body) {
+    const code = validate(ticketCodeSchema, { ticket_code: ticketCode }).ticket_code;
+    const input = validate(closeTicketSchema, body);
+    return this.ticketRepository.closeTicket({
+      ticketCode: code,
+      closedBy: input.closed_by,
+      note: input.note,
     });
   }
 
