@@ -1,0 +1,116 @@
+﻿BT2 TEST AND BUILD VALIDATION
+Date: 2026-10-31
+
+COMMAND: npm test
+
+> smartcrm-2374802010281-phan_cong_ky_thuat_vien@1.0.0 test
+> node --test
+
+✔ GET /health is a liveness check and does not require the database (36.8071ms)
+✔ GET /health/ready checks database connectivity (3.2718ms)
+Database readiness check failed: Error: database unavailable
+    at Object.query (D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\tests\app.test.js:29:15)
+    at D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\src\app.js:49:18
+    at Layer.handle [as handle_request] (D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\node_modules\express\lib\router\layer.js:95:5)
+    at next (D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\node_modules\express\lib\router\route.js:149:13)
+    at Route.dispatch (D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\node_modules\express\lib\router\route.js:119:3)
+    at Layer.handle [as handle_request] (D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\node_modules\express\lib\router\layer.js:95:5)
+    at D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\node_modules\express\lib\router\index.js:284:15
+    at router.process_params (D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\node_modules\express\lib\router\index.js:346:12)
+    at next (D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\node_modules\express\lib\router\index.js:280:10)
+    at SendStream.error (D:\chuyên đề tốt nghiệp 1\Nguyen_Ngo_Ngoc_Long-2374802010281-phan-cong-ky-thuat-vien\node_modules\serve-static\index.js:121:7)
+✔ GET /health/ready returns 503 when the database is unavailable (2.4965ms)
+✔ business APIs require a valid authenticated session (2.1025ms)
+✔ expired sessions are rejected and their cookies are cleared (2.6573ms)
+✔ login establishes an HttpOnly session and exposes the authenticated user (8.1302ms)
+✔ session endpoint returns the authenticated user and logout clears the cookie (2.3023ms)
+✔ unknown routes return a JSON 404 response (2.2879ms)
+✔ malformed JSON is reported as a client error (2.5194ms)
+▶ GET /api/tickets forwards filters and returns the list contract
+  ✔ ticket collection and item routes expose create, read, update, and safe close operations (6.0442ms)
+✔ GET /api/tickets forwards filters and returns the list contract (8.6192ms)
+✔ POST assignment accepts an encoded ticket code containing a slash (2.1132ms)
+✔ assignment input errors use the documented JSON error format (8.3227ms)
+✔ technician, assigned-work and appointment endpoints use live service contracts (6.1462ms)
+✔ bootstrap, login, session lookup and logout manage hashed credentials and session IDs (74.6041ms)
+✔ invalid credentials return the same unauthorized error for unknown users and wrong passwords (81.2341ms)
+✔ bootstrap enforces a unique account username and a strong initial password (0.5948ms)
+✔ ticket creation validates dates and maps source fields to the repository (3.4588ms)
+✔ ticket creation rejects malformed or contradictory input before repository access (1.7523ms)
+✔ ticket updates require at least one valid editable field (0.5913ms)
+✔ ticket delete is a soft close that preserves its status history (0.794ms)
+✔ ticket close rejects records already assigned or scheduled (0.7724ms)
+✔ appointment update validates the identifier and forwards only editable fields (0.8469ms)
+✔ appointment update checks the active reservation and retains its row (0.4793ms)
+✔ appointment delete cancels only active appointments and preserves the record (0.2686ms)
+◇ injected env (11) from .env
+✔ CSV parser preserves escaped quotes, commas and embedded line breaks (2.4415ms)
+✔ CSV parser rejects malformed quoted records and mismatched columns (0.6566ms)
+✔ Vietnam local appointment time maps to the correct UTC instant regardless of host timezone (1.2712ms)
+✔ adding appointment duration crosses dates using Vietnam wall-clock time (0.1705ms)
+✔ invalid Vietnam appointment dates are rejected (0.0815ms)
+✔ default appointment time uses Vietnam wall-clock time rounded to a quarter-hour (0.1082ms)
+◇ injected env (11) from .env
+✔ migrations are applied once in lexical order and checksum-verified (3.2985ms)
+✔ migration runner refuses to apply over a legacy schema (0.4536ms)
+◇ injected env (11) from .env
+✔ seed runner can execute twice and wraps each fixture in a transaction (1.9743ms)
+✔ demo fixture uses conflict and existence guards for repeated inserts (0.6127ms)
+✔ appointment creation uses assigned technician and commits the selected slot (1.648ms)
+✔ appointment creation rolls back when the technician already has an overlapping slot (0.6321ms)
+✔ technician suggestions forward skill, center, and active filters (3.7724ms)
+✔ technician input errors return 422 with invalid fields (1.1706ms)
+✔ appointment creation normalizes an ISO date and optional note (0.9938ms)
+✔ invalid appointment data returns 422 and identifies bad fields (0.6495ms)
+✔ L4 schema creates exactly six business entities (1.9079ms)
+✔ schema uses dataset values and preserves the half-open appointment overlap rule (0.2566ms)
+✔ demo seed contains one unassigned ticket and 17 assigned open tickets (0.2202ms)
+▶ listTickets normalizes pagination and forwards supported filters
+  ✔ listTickets rejects malformed exact ticket filters (1.8646ms)
+✔ listTickets normalizes pagination and forwards supported filters (4.3447ms)
+✔ listTickets rejects statuses outside the dataset vocabulary (0.6805ms)
+✔ assignTicket trims the actor code and supplies a false overload default (0.3659ms)
+✔ assignTicket rejects malformed identifier and request values (0.4314ms)
+✔ toTicketView keeps the presentation contract, ISO dates, nulls, and masked phone (2.1338ms)
+✔ toTicketView rejects malformed ticket data (0.2943ms)
+✔ list returns an accurate total even when the requested page is empty (1.8208ms)
+✔ assignment is atomic and writes status and assignment history (0.6354ms)
+✔ assignment requires explicit confirmation above workload threshold (0.5197ms)
+✔ assignment rejects a technician below the minimum skill proficiency (0.2286ms)
+✔ assignment is permitted after the manager confirms an overloaded technician (0.188ms)
+✔ assignment rejects a ticket that is no longer waiting (0.1888ms)
+✔ status changes verify the current technician and write history atomically (0.3783ms)
+✔ status changes reject an invalid transition before updating the ticket (0.1998ms)
+✔ createTicket creates an MOI ticket from normalized L4 fields (2.1516ms)
+✔ getTicket validates its identifier before reading from the repository (0.6439ms)
+✔ updateTicket forwards validated fields without accepting workflow status changes (0.3321ms)
+✔ closeTicket validates the audit actor and note (0.5947ms)
+✔ create validation rejects missing fields and identifies them (2.0063ms)
+✔ create validation rejects unsafe serial identifiers (0.7468ms)
+✔ create validation rejects invalid codes and datetime values (0.2805ms)
+✔ update validation rejects empty or unsupported changes (0.6435ms)
+ℹ tests 67
+ℹ suites 0
+ℹ pass 67
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 284.0773
+EXIT_CODE: 0
+
+COMMAND: npm run build
+
+> smartcrm-2374802010281-phan_cong_ky_thuat_vien@1.0.0 build
+> vite build
+
+[36mvite v6.4.5 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 20 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m 0.47 kB[22m[1m[22m[2m │ gzip:  0.32 kB[22m
+[2mdist/[22m[35massets/index-Km0Xk75V.css  [39m[1m[2m11.08 kB[22m[1m[22m[2m │ gzip:  3.03 kB[22m
+[2mdist/[22m[36massets/index-CfFN0WyQ.js   [39m[1m[2m34.85 kB[22m[1m[22m[2m │ gzip: 10.39 kB[22m
+[32m✓ built in 104ms[39m
+EXIT_CODE: 0
