@@ -12,9 +12,20 @@
    `src/services/ticket-l4.service.js` và Zod qua `src/validation.js`.
 6. **Sửa nguyên nhân:** chuyển hai bộ test sang xác nhận hợp đồng CRUD L4 và dữ liệu sai; giữ các
    test trong lệnh chạy đầy đủ, không bỏ qua hoặc lọc lỗi.
-7. **Xác nhận:** `npm test` PASS 63/63; `npm run test:l4` PASS 55/55; `npm run build` PASS.
-   Migration `004_ticket_crud.sql` và seed `001_demo.sql` đã chạy hai lần trên database PostgreSQL
-   phát triển `smartcrm_l4_workshop`; lần thứ hai migration được bỏ qua đúng checksum và seed chạy
-   lại thành công. Kiểm thử CRUD thật qua PostgreSQL PASS cho tạo/đọc/sửa/đóng mềm phiếu và
-   tạo/đọc/sửa/hủy mềm lịch hẹn; các bản ghi chỉ dùng cho kiểm thử đã được dọn. Không tạo commit
-   riêng trong lượt này.
+7. **Xác nhận:** lần chạy ban đầu `npm test` PASS 63/63; ngày 31/10/2026 chạy lại `npm test`
+   PASS 67/67 (0 fail, 0 skipped) và `npm run build` PASS, cả hai lệnh có mã thoát 0.
+   Migration/seed và CRUD được xác minh trên một PostgreSQL database riêng
+   `smartcrm_l4_bt2_c5_20261031`, không chạy lặp trên database workshop.
+
+## Cập nhật kiểm chứng C5 và CRUD — 31/10/2026
+
+1. Tạo database PostgreSQL cô lập `smartcrm_l4_bt2_c5_20261031`.
+2. Chạy `npm run migrate`, `npm run seed`, rồi chạy lại cả hai lệnh. Lượt migrate thứ hai bỏ qua
+   đủ bốn migration theo checksum; số dòng sau seed lần 1 và lần 2 không đổi:
+   technician 2, technician_skill 7, ticket 18, ticket_assignment 17,
+   ticket_status_log 18, appointment 0; hai bảng xác thực vẫn rỗng trước bootstrap.
+3. Qua API HTTP có xác thực, thực hiện create/read/update/soft-delete cho ticket và appointment.
+   Ticket được lưu với trạng thái `DA_DONG`; appointment được lưu với trạng thái `KHACH_HUY`.
+   Đọc lại từ PostgreSQL xác nhận các bản ghi vẫn tồn tại theo đúng trạng thái mềm.
+4. Xóa database cô lập sau xác minh. Log kết quả và mã thoát 0 nằm tại
+   `docs/evidence/09-c5-crud-validation.txt`.

@@ -1,0 +1,51 @@
+BT2 EVIDENCE: C5 IDEMPOTENCE AND TICKET/APPOINTMENT CRUD
+Date: 2026-10-31
+Database: isolated PostgreSQL database smartcrm_l4_bt2_c5_20261031
+Scope: created for this validation only; the workshop database was not used for C5.
+
+C5 - MIGRATE AND SEED TWICE
+Commands executed in order:
+  npm run migrate
+  npm run seed
+  npm run migrate
+  npm run seed
+
+The second migration run skipped all four migrations by checksum:
+  001_init.sql
+  002_tickets.sql
+  003_auth.sql
+  004_ticket_crud.sql
+
+Row counts after seed #1 and seed #2:
+  Table                 Seed #1   Seed #2   Change
+  appointment                 0         0        0
+  auth_session                0         0        0
+  auth_user                   0         0        0
+  technician                 2         2        0
+  technician_skill           7         7        0
+  ticket                    18        18        0
+  ticket_assignment         17        17        0
+  ticket_status_log         18        18        0
+
+C5 RESULT: PASS. Re-running migrations and seed completed successfully; no row
+counts changed.
+
+AUTHENTICATED API CRUD - SAME ISOLATED DATABASE
+Ticket BH-899998/2026:
+  Create: HTTP 201, status MOI
+  Read:   HTTP 200, record returned
+  Update: HTTP 200, issue_desc updated
+  Delete: HTTP 200, soft-close status DA_DONG
+  Database read-back confirmed the ticket remains stored as DA_DONG.
+
+Appointment for ticket BH-900010/2025:
+  Create: HTTP 201, appointment id 1, status DA_DAT
+  Read:   HTTP 200, record returned
+  Update: HTTP 200, note updated
+  Delete: HTTP 200, soft-cancel status KHACH_HUY
+  Database read-back confirmed the appointment remains stored as KHACH_HUY.
+
+CRUD RESULT: PASS. Create/read/update/soft-delete were exercised for both
+entities through the authenticated HTTP API.
+Cleanup: the isolated database was dropped after verification.
+Validation process exit code: 0

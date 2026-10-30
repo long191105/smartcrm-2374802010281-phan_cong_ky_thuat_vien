@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M1,1 L11,6 L1,11 Z" fill="#334155"/>
+    </marker>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #14283f; }
+      .layer { stroke-width: 3; rx: 18; }
+      .card { fill: #fff; stroke-width: 2; rx: 10; }
+      .title { font-size: 30px; font-weight: 700; }
+      .layer-title { font-size: 22px; font-weight: 700; }
+      .label { font-size: 19px; font-weight: 700; }
+      .detail { font-size: 15px; }
+      .flow { stroke: #334155; stroke-width: 4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1400" height="820" fill="#f8fafc"/>
+  <text x="700" y="46" text-anchor="middle" class="title">Kiến trúc thực tế — Smart CRM, luồng L4</text>
+
+  <rect x="55" y="75" width="1290" height="135" class="layer" fill="#e3f2fd" stroke="#1f4e79"/>
+  <text x="82" y="110" class="layer-title">1. Giao diện web · JavaScript ES modules / Vite</text>
+  <rect x="90" y="130" width="360" height="58" class="card" stroke="#1f4e79"/>
+  <rect x="520" y="130" width="360" height="58" class="card" stroke="#1f4e79"/>
+  <rect x="950" y="130" width="360" height="58" class="card" stroke="#1f4e79"/>
+  <text x="270" y="166" text-anchor="middle" class="label">M1 · Phân công kỹ thuật viên</text>
+  <text x="700" y="166" text-anchor="middle" class="label">M2 · Đặt lịch hẹn</text>
+  <text x="1130" y="166" text-anchor="middle" class="label">M3 · Công việc của tôi</text>
+
+  <line x1="700" y1="212" x2="700" y2="250" class="flow"/>
+  <rect x="55" y="260" width="1290" height="135" class="layer" fill="#e8f5e9" stroke="#2e7d32"/>
+  <text x="82" y="296" class="layer-title">2. API REST · Node.js / Express</text>
+  <rect x="100" y="318" width="350" height="58" class="card" stroke="#2e7d32"/>
+  <rect x="525" y="318" width="350" height="58" class="card" stroke="#2e7d32"/>
+  <rect x="950" y="318" width="350" height="58" class="card" stroke="#2e7d32"/>
+  <text x="275" y="354" text-anchor="middle" class="label">Xác thực phiên / kiểm tra quyền</text>
+  <text x="700" y="354" text-anchor="middle" class="label">Routes · Controllers</text>
+  <text x="1125" y="354" text-anchor="middle" class="label">Validation · HTTP errors</text>
+
+  <line x1="700" y1="397" x2="700" y2="435" class="flow"/>
+  <rect x="55" y="445" width="1290" height="145" class="layer" fill="#fff8e1" stroke="#b8860b"/>
+  <text x="82" y="481" class="layer-title">3. Nghiệp vụ · Services</text>
+  <rect x="95" y="505" width="275" height="62" class="card" stroke="#b8860b"/>
+  <rect x="405" y="505" width="275" height="62" class="card" stroke="#b8860b"/>
+  <rect x="715" y="505" width="275" height="62" class="card" stroke="#b8860b"/>
+  <rect x="1025" y="505" width="275" height="62" class="card" stroke="#b8860b"/>
+  <text x="232" y="543" text-anchor="middle" class="label">Phân công / workload</text>
+  <text x="542" y="543" text-anchor="middle" class="label">Lịch hẹn / chống trùng</text>
+  <text x="852" y="543" text-anchor="middle" class="label">Trạng thái / lịch sử</text>
+  <text x="1162" y="543" text-anchor="middle" class="label">Quy tắc CRUD</text>
+
+  <line x1="700" y1="592" x2="700" y2="630" class="flow"/>
+  <rect x="55" y="640" width="1290" height="130" class="layer" fill="#f3e5f5" stroke="#6a1b9a"/>
+  <text x="82" y="677" class="layer-title">4. Persistence · Repository / PostgreSQL</text>
+  <text x="700" y="713" text-anchor="middle" class="label">ticket · technician · technician_skill · ticket_assignment · appointment · ticket_status_log</text>
+  <text x="700" y="745" text-anchor="middle" class="detail">auth_user / auth_session hỗ trợ đăng nhập; customer_id và product_id là tham chiếu ngoài phạm vi L4.</text>
+</svg>
