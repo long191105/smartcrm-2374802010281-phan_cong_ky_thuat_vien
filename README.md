@@ -261,6 +261,8 @@ npm run test:l4
 
 Các test dùng fixture/fake cho repository và API nên không yêu cầu PostgreSQL đang chạy. Để xác minh
 toàn bộ luồng với dữ liệu thật, cần PostgreSQL đã cấu hình, sau đó chạy migration và seed trước.
+Kế hoạch và kết quả kiểm thử BT2 được ghi tại [`docs/test-plan.md`](./docs/test-plan.md) và
+[`docs/test-report.md`](./docs/test-report.md); các giới hạn kiểm chứng phải được đọc cùng báo cáo.
 
 ## 8. API chính
 

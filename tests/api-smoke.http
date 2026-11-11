@@ -1,0 +1,40 @@
+@baseUrl = http://localhost:8000
+@ticketCode = BH-900001%2F2025
+@sessionCookie = replace-with-smartcrm_session-cookie-from-login-response
+
+### Login (copy the smartcrm_session cookie into @sessionCookie; do not commit real values)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "manager",
+  "password": "replace-with-local-bootstrap-password"
+}
+
+### Unauthenticated access must be rejected (remove the Cookie header to run this case)
+GET {{baseUrl}}/api/tickets
+
+### Authenticated ticket lookup
+GET {{baseUrl}}/api/tickets/{{ticketCode}}
+Cookie: {{sessionCookie}}
+
+### Missing ticket returns 404
+GET {{baseUrl}}/api/tickets/BH-900099%2F2025
+Cookie: {{sessionCookie}}
+
+### Invalid ticket payload returns the documented 422 response
+POST {{baseUrl}}/api/tickets
+Content-Type: application/json
+Cookie: {{sessionCookie}}
+
+{}
+
+### Technician status transition (actor code is a prototype request field, not authenticated identity)
+PATCH {{baseUrl}}/api/tickets/{{ticketCode}}/status
+Content-Type: application/json
+Cookie: {{sessionCookie}}
+
+{
+  "status": "DANG_XU_LY",
+  "changed_by": "KT002"
+}

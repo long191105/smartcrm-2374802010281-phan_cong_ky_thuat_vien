@@ -136,3 +136,34 @@ khi rà soát được ghi rõ là "Tự phát hiện".
 - **Ảnh hưởng:** `docs/srs.md`, `docs/erd.drawio`, API contract, migration, seed và README ghi rõ ánh xạ
   CSV → bảng; không commit các CSV nguồn lớn. Dữ liệu khách hàng thô, đơn hàng, sản phẩm và linh kiện
   không thuộc phạm vi L4.
+
+## Sau phản hồi Bài tập 2 (10/11/2026)
+
+### TD-11 Ghi nhận kết quả đánh giá và giới hạn kiểm chứng tích hợp L2→L4
+
+- **Phản hồi của GV:** Luồng L4 chạy đăng nhập → M1 phân công (gợi ý theo tay nghề/tải việc, xác nhận
+  khi quá ngưỡng) → M2 đặt lịch → M3 cập nhật trạng thái; kiến trúc Route–Controller–Service–Repository,
+  14 tệp kiểm thử, Docker và khôi phục baseline sau E2E là điểm mạnh. Chưa kiểm chứng tích hợp trực tiếp
+  L2→L4; có thể tạo GitHub Release cho tag `v0.2`. Bảng 4.2 đạt các mục chung và theo track.
+- **Quyết định:** GIỮ phạm vi L4 hiện tại; bổ sung Test Plan/Report và kiểm tra hợp đồng POST `/api/tickets`,
+  nhưng không tuyên bố đã tích hợp trực tiếp L2→L4. Ghi nhận GitHub Release `v0.2` là việc phát hành
+  khuyến khích, chưa xác nhận đã tạo.
+- **Lý do:** Repo hiện không chứa mã nguồn L2, địa chỉ dịch vụ L2 hay đặc tả payload tích hợp để chạy
+  end-to-end. Tự tạo adapter/payload không có căn cứ sẽ không chứng minh được hai hệ thống tương thích.
+- **Ảnh hưởng:** `docs/test-plan.md`, `docs/test-report.md` nêu rõ phạm vi/giới hạn và bằng chứng; cần có
+  endpoint hoặc tài liệu giao tiếp L2, quyền phát hành GitHub và ảnh terminal riêng từng test case để
+  hoàn tất các minh chứng còn thiếu.
+
+### TD-12 Thống nhất mã HTTP validation và giới hạn kiểm thử phân quyền
+
+- **Phản hồi của GV:** Checklist yêu cầu lỗi thiếu trường trả HTTP 400; đồng thời cần kiểm tra 403/404
+  và các mục OWASP.
+- **Quyết định:** Giữ HTTP 422 `VALIDATION_ERROR` theo API contract; ghi nhận đây là sai khác rubric.
+  A01 không áp dụng như một mô hình phân quyền hoàn chỉnh trong prototype hiện tại.
+- **Lý do:** `src/validation.js` và `docs/api_contract.md` cùng quy định 422 cho dữ liệu nghiệp vụ sai.
+  Phiên đăng nhập hiện chỉ có tài khoản quản lý; `changed_by` là mã do request gửi lên, chưa được bind
+  với danh tính người dùng đã xác thực nên test 403 chỉ chứng minh mã actor không khớp người được giao,
+  không chứng minh kiểm soát danh tính chống giả mạo.
+- **Ảnh hưởng:** `docs/test-plan.md` và `docs/test-report.md` dùng 422 làm kết quả mong đợi, ghi rõ giới
+  hạn A01 và không tuyên bố hệ thống phù hợp production; muốn bảo đảm quyền kỹ thuật viên phải có mô
+  hình tài khoản/vai trò riêng và thay đổi ngoài phạm vi hiện tại.

@@ -15,7 +15,9 @@
 7. **Xác nhận:** lần chạy ban đầu `npm test` PASS 63/63; ngày 31/10/2026 chạy lại `npm test`
    PASS 67/67 (0 fail, 0 skipped) và `npm run build` PASS, cả hai lệnh có mã thoát 0.
    Migration/seed và CRUD được xác minh trên một PostgreSQL database riêng
-   `smartcrm_l4_bt2_c5_20261031`, không chạy lặp trên database workshop.
+   `smartcrm_l4_bt2_c5_20261031`, không chạy lặp trên database workshop. Phần cập nhật test nằm trong
+   commit `408b196`, commit này cũng thay đổi nhiều file chức năng/tài liệu nên không phải commit riêng
+   cho BUG-01.
 
 ## Cập nhật kiểm chứng C5 và CRUD — 31/10/2026
 
@@ -43,4 +45,5 @@
 6. **Sửa nguyên nhân:** ánh xạ rõ `type === 'entity.too.large'` và status 413 thành
    `PAYLOAD_TOO_LARGE`; thêm assertion HTTP kiểm status/body.
 7. **Xác nhận:** test hồi quy trước sửa tái hiện 500 (1 FAIL); sau sửa test riêng và `npm test`
-   PASS, response là 413. Commit riêng sẽ được ghi sau khi commit.
+   PASS, response là 413. Sửa code/test nằm riêng trong commit
+   `3b52a0e`.
