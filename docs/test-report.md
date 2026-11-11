@@ -2,9 +2,8 @@
 
 **Cập nhật:** 11/11/2026
 
-**Commit local:** `3b52a0e` (fix BUG-02), `abd0c17` (boundary/auth tests); chưa push.
-**Trạng thái tài liệu:** Test Plan/Report, Test Design, README, CI, file `.http` và báo cáo Word còn
-trong worktree, chưa commit/push; hai commit trên không chứa các tài liệu đó.
+**Commit local:** `3b52a0e` (fix BUG-02), `abd0c17` (boundary/auth tests), `ea7d840`
+(Test Plan/Report, Test Design, README, CI, `.http` và báo cáo Word); chưa push.
 
 **Lệnh:** `npm test` — exit code 0; **72 PASS, 0 FAIL, 0 SKIP**.
 
