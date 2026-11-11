@@ -84,6 +84,14 @@ function createApp({
       });
     }
 
+    if (error.type === 'entity.too.large' && error.status === 413) {
+      return res.status(413).json({
+        error: 'PAYLOAD_TOO_LARGE',
+        message: 'Nội dung gửi lên vượt giới hạn cho phép.',
+        fields: {},
+      });
+    }
+
     if (error instanceof AppError) {
       const response = {
         error: error.code,

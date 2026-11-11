@@ -29,3 +29,18 @@
    Đọc lại từ PostgreSQL xác nhận các bản ghi vẫn tồn tại theo đúng trạng thái mềm.
 4. Xóa database cô lập sau xác minh. Log kết quả và mã thoát 0 nằm tại
    `docs/evidence/09-c5-crud-validation.txt`.
+
+## BUG-02 — JSON vượt giới hạn bị báo nhầm là lỗi hệ thống
+
+1. **Thời điểm:** 11/11/2026, khi bổ sung kiểm thử giới hạn request HTTP.
+2. **Tái lập:** gửi `POST /api/auth/login` với `Content-Type: application/json` và JSON body lớn hơn
+   1 MiB; có thể tái lập bằng `node --test --test-name-pattern="oversized JSON requests" tests/app.test.js`.
+3. **Hiện tượng trước sửa:** body-parser báo `entity.too.large`, nhưng middleware trả HTTP 500
+   `INTERNAL_ERROR` thay vì 413.
+4. **Mong đợi:** HTTP 413 với lỗi JSON chung, không trả stack/chi tiết parser.
+5. **Nguyên nhân:** error middleware chỉ ánh xạ JSON sai cú pháp và `AppError`; lỗi kích thước từ
+   `express.json({ limit: '1mb' })` rơi vào nhánh lỗi hệ thống mặc định.
+6. **Sửa nguyên nhân:** ánh xạ rõ `type === 'entity.too.large'` và status 413 thành
+   `PAYLOAD_TOO_LARGE`; thêm assertion HTTP kiểm status/body.
+7. **Xác nhận:** test hồi quy trước sửa tái hiện 500 (1 FAIL); sau sửa test riêng và `npm test`
+   PASS, response là 413. Commit riêng sẽ được ghi sau khi commit.
