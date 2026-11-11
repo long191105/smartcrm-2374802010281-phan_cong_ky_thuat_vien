@@ -2,8 +2,11 @@
 
 **Cập nhật:** 11/11/2026
 
-**Commit local:** `3b52a0e` (fix BUG-02), `abd0c17` (boundary/auth tests), `ea7d840`
-(Test Plan/Report, Test Design, README, CI, `.http` và báo cáo Word); chưa push.
+**Commit đã push lên `dev`:** [3b52a0e](https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien/commit/3b52a0e)
+(fix BUG-02), [abd0c17](https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien/commit/abd0c17)
+(boundary/auth tests), [ea7d840](https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien/commit/ea7d840)
+(Test Plan/Report, Test Design, README, CI, `.http`, báo cáo Word). Bản report được cập nhật tiếp
+trong commit metadata sau đó.
 
 **Lệnh:** `npm test` — exit code 0; **72 PASS, 0 FAIL, 0 SKIP**.
 
@@ -65,6 +68,6 @@ trong phiên này.
 - Chưa tạo GitHub Release v0.2. Branch hiện là `dev`; cần chốt commit/tag sau khi ảnh terminal được
   tạo và tài liệu được review.
 
-**Kết luận:** npm test PASS (72/72) và build PASS. Checklist nộp vẫn **CHƯA ĐẠT ĐỦ** vì thiếu ảnh test
-case, PostgreSQL integration hiện tại, ≥3 bug thật đã sửa bằng commit tách biệt, link commit/push bản
-cuối và GitHub Release hoặc quyết định phát hành.
+**Kết luận:** `npm test` PASS (72/72) và build PASS. Checklist nộp vẫn **CHƯA ĐẠT ĐỦ** vì thiếu ảnh test
+case, PostgreSQL integration hiện tại, ≥3 bug thật đã sửa bằng commit tách biệt (hiện chỉ xác minh
+được BUG-02 trong phiên này), và GitHub Release v0.2 hoặc quyết định phát hành cuối.
