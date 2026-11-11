@@ -243,48 +243,48 @@ test('GET /api/tickets forwards filters and returns the list contract', async ()
     headers: sessionHeaders,
   });
 
-  test('ticket collection and item routes expose create, read, update, and safe close operations', async () => {
-    const created = await fetch(`${baseUrl}/api/tickets`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...sessionHeaders },
-      body: JSON.stringify({ ticket_code: 'BH-900099/2025' }),
-    });
-    assert.equal(created.status, 201);
-    assert.deepEqual(await created.json(), {
-      ticket_code: 'BH-900099/2025',
-      status: 'MOI',
-    });
-    assert.equal(ticketServiceCalls.at(-1).method, 'ticket-create');
-
-    const code = encodeURIComponent('BH-900099/2025');
-    const read = await fetch(`${baseUrl}/api/tickets/${code}`, { headers: sessionHeaders });
-    assert.equal(read.status, 200);
-    assert.deepEqual(await read.json(), { ticket_code: 'BH-900099/2025', status: 'MOI' });
-
-    const updated = await fetch(`${baseUrl}/api/tickets/${code}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json', ...sessionHeaders },
-      body: JSON.stringify({ priority: 'CAO' }),
-    });
-    assert.equal(updated.status, 200);
-    assert.deepEqual(await updated.json(), { ticket_code: 'BH-900099/2025', priority: 'CAO' });
-
-    const closed = await fetch(`${baseUrl}/api/tickets/${code}`, {
-      method: 'DELETE',
-      headers: { 'content-type': 'application/json', ...sessionHeaders },
-      body: JSON.stringify({ closed_by: 'manager' }),
-    });
-    assert.equal(closed.status, 200);
-    assert.deepEqual(await closed.json(), { ticket_code: 'BH-900099/2025', status: 'DA_DONG' });
-    assert.equal(ticketServiceCalls.at(-1).method, 'ticket-close');
-  });
-
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { items: [], total: 0 });
   assert.deepEqual(ticketServiceCalls.at(-1), {
     method: 'list',
     query: { status: 'MOI', center_code: 'TT04', ticket_code: 'BH-900001/2025' },
   });
+});
+
+test('ticket collection and item routes expose create, read, update, and safe close operations', async () => {
+  const created = await fetch(`${baseUrl}/api/tickets`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...sessionHeaders },
+    body: JSON.stringify({ ticket_code: 'BH-900099/2025' }),
+  });
+  assert.equal(created.status, 201);
+  assert.deepEqual(await created.json(), {
+    ticket_code: 'BH-900099/2025',
+    status: 'MOI',
+  });
+  assert.equal(ticketServiceCalls.at(-1).method, 'ticket-create');
+
+  const code = encodeURIComponent('BH-900099/2025');
+  const read = await fetch(`${baseUrl}/api/tickets/${code}`, { headers: sessionHeaders });
+  assert.equal(read.status, 200);
+  assert.deepEqual(await read.json(), { ticket_code: 'BH-900099/2025', status: 'MOI' });
+
+  const updated = await fetch(`${baseUrl}/api/tickets/${code}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...sessionHeaders },
+    body: JSON.stringify({ priority: 'CAO' }),
+  });
+  assert.equal(updated.status, 200);
+  assert.deepEqual(await updated.json(), { ticket_code: 'BH-900099/2025', priority: 'CAO' });
+
+  const closed = await fetch(`${baseUrl}/api/tickets/${code}`, {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json', ...sessionHeaders },
+    body: JSON.stringify({ closed_by: 'manager' }),
+  });
+  assert.equal(closed.status, 200);
+  assert.deepEqual(await closed.json(), { ticket_code: 'BH-900099/2025', status: 'DA_DONG' });
+  assert.equal(ticketServiceCalls.at(-1).method, 'ticket-close');
 });
 
 test('POST assignment accepts an encoded ticket code containing a slash', async () => {
