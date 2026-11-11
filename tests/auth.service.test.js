@@ -74,15 +74,24 @@ test('invalid credentials return the same unauthorized error for unknown users a
     displayName: 'Quản lý',
   });
 
+  const failures = [];
   for (const credentials of [
     { username: 'manager', password: 'incorrect-password' },
     { username: 'missing', password: 'incorrect-password' },
   ]) {
     await assert.rejects(
       auth.login(credentials),
-      (error) => error.statusCode === 401 && error.code === 'INVALID_CREDENTIALS',
+      (error) => {
+        failures.push({
+          statusCode: error.statusCode,
+          code: error.code,
+          message: error.message,
+        });
+        return error.statusCode === 401 && error.code === 'INVALID_CREDENTIALS';
+      },
     );
   }
+  assert.deepEqual(failures[0], failures[1]);
 });
 
 test('bootstrap enforces a unique account username and a strong initial password', async () => {

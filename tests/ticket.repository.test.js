@@ -124,6 +124,42 @@ test('assignment requires explicit confirmation above workload threshold', async
   assert.ok(!database.queries.some(({ sql }) => sql.startsWith('INSERT INTO ticket_assignment')));
 });
 
+test('assignment at 14 open tickets is below the confirmation boundary', async () => {
+  const database = createDatabase({ workload: 14 });
+  const repository = new TicketRepository(database.pool);
+
+  const result = await repository.assign({
+    ticketCode: 'BH-900001/2025',
+    technicianCode: 'KT002',
+    assignedBy: '8',
+    confirmOverload: false,
+  });
+
+  assert.equal(result.status, 'DA_PHAN_CONG');
+  assert.ok(database.queries.some(({ sql }) => sql.startsWith('INSERT INTO ticket_assignment')));
+  assert.ok(database.queries.some(({ sql }) => sql === 'COMMIT'));
+});
+
+test('assignment at 15 open tickets requires explicit confirmation', async () => {
+  const database = createDatabase({ workload: 15 });
+  const repository = new TicketRepository(database.pool);
+
+  await assert.rejects(
+    () => repository.assign({
+      ticketCode: 'BH-900001/2025',
+      technicianCode: 'KT002',
+      assignedBy: '8',
+      confirmOverload: false,
+    }),
+    (error) => error instanceof AppError
+      && error.statusCode === 409
+      && error.code === 'OVERLOAD_CONFIRMATION_REQUIRED'
+      && error.details.open_tickets === 15,
+  );
+  assert.ok(database.queries.some(({ sql }) => sql === 'ROLLBACK'));
+  assert.ok(!database.queries.some(({ sql }) => sql.startsWith('INSERT INTO ticket_assignment')));
+});
+
 test('assignment rejects a technician below the minimum skill proficiency', async () => {
   const database = createDatabase({ proficiency: 2 });
   const repository = new TicketRepository(database.pool);
