@@ -1,9 +1,10 @@
 # API Reference — BT3
 
 This reference inventories every Express route in `src/app.js` and the route modules: **21 routes**
-(18 under `/api`, plus `/`, `/health`, and `/health/ready`). The API contract remains the detailed
-source for request and response examples. No role-based authorization is implemented: business API
-routes require an authenticated session, but the prototype has no technician/manager role enforcement.
+(18 under `/api`, plus `/`, `/health`, and `/health/ready`). All routes have contract documentation
+below; genuine database-backed examples currently cover only four distinct endpoints, so Track SE
+criterion S1 is not fully met. No role-based authorization is implemented: business API routes
+require an authenticated session, but the prototype has no technician/manager role enforcement.
 
 ## Common rules
 
@@ -26,7 +27,7 @@ routes require an authenticated session, but the prototype has no technician/man
 | `GET /api/auth/me` | Return the authenticated user. | Valid session cookie required. | Cookie `smartcrm_session`; no query/body. | `200 {"user":{…}}`. | `401 UNAUTHORIZED`, `500`. | Session lifetime 8 hours. |
 | `POST /api/auth/logout` | Revoke the supplied session and clear its cookie. | No active session required; a cookie is optional. | Optional session cookie; no query/body. | `204` empty response. | `500`. | One cookie; no body. |
 | `GET /api/tickets` | List and filter tickets. | Valid session cookie required. | Query: `ticket_code`, `status`, `center_code`, `category_name`, `limit`, `offset`. | `200 {"items":[…],"total":n}`. | `401`, `422`, `500`. | `limit` 1–100, default 100; `offset` ≥0. |
-| `POST /api/tickets` | Create a new `MOI` ticket. | Valid session cookie required. | Ticket fields documented in `api_contract.md` E9. | `201` with created ticket. | `400`, `401`, `409 TICKET_CODE_EXISTS`, `413`, `422`, `500`. | Body ≤1 MiB; issue description ≤2,000 chars. |
+| `POST /api/tickets` | Create a new `MOI` ticket. | Valid session cookie required. | JSON fields: `ticket_code`, `customer_id`, `product_id`, `serial_no`, `center_code`, `category_name`, `priority`, `issue_desc`, `received_at`, `due_date`, `is_warranty`, `created_by`. | `201` with `ticket_id`, ticket fields, and initial status. | `400`, `401`, `409 TICKET_CODE_EXISTS`, `413`, `422`, `500`. | Body ≤1 MiB; issue description ≤2,000 chars. |
 | `GET /api/tickets/{ticketCode}` | Read a ticket by code. | Valid session cookie required. | Path `ticketCode`; no query/body. | `200` with ticket. | `401`, `404`, `422`, `500`. | Code format `BH-######/YYYY`; URL-encode `/`. |
 | `PATCH /api/tickets/{ticketCode}` | Update editable fields on an unassigned `MOI` ticket. | Valid session cookie required. | Path code; at least one editable ticket field in JSON. | `200` with updated ticket. | `400`, `401`, `404`, `409`, `413`, `422`, `500`. | Body ≤1 MiB; fields are restricted by the service schema. |
 | `DELETE /api/tickets/{ticketCode}` | Soft-close an eligible new ticket; preserves history. | Valid session cookie required. | Path code; JSON `closed_by`, optional `note`. | `200` with `status:"DA_DONG"`. | `400`, `401`, `404`, `409`, `413`, `422`, `500`. | Body ≤1 MiB; note ≤255 chars. |
@@ -36,7 +37,7 @@ routes require an authenticated session, but the prototype has no technician/man
 | `GET /api/technicians` | List/filter technicians and workload. | Valid session cookie required. | Query `category_name`, `center_code`, `status`, `limit`. | `200 {"items":[…],"total":n}`. | `401`, `422`, `500`. | `limit` 1–100, default 100. |
 | `GET /api/technicians/{technicianCode}/tickets` | List assigned work for a technician. | Valid session cookie required; no role check. | Path `technicianCode`; optional query `status`. | `200` assigned-work list (empty when no rows match). | `401`, `422`, `500`. | Technician code `KT` plus 3 digits. |
 | `GET /api/appointments` | List appointments by technician/date. | Valid session cookie required. | Optional query `technician_code`, `date` (`YYYY-MM-DD`). | `200` appointment list. | `401`, `422`, `500`. | Maximum 100 appointments. |
-| `POST /api/appointments` | Create a reservation for an assigned ticket. | Valid session cookie required. | JSON fields documented in `api_contract.md` E4. | `201` with appointment. | `400`, `401`, `404`, `409`, `413`, `422`, `500`. | Body ≤1 MiB; duration 15–240 minutes; overlaps rejected. |
+| `POST /api/appointments` | Create a reservation for an assigned ticket. | Valid session cookie required. | JSON fields: `ticket_code`, `appointment_type`, `scheduled_start`, `duration_minutes`, optional `note`. Technician is taken from the current assignment. | `201` with `appointment_id`, ticket/technician/center codes, type, start/end times, and status. | `400`, `401`, `404`, `409`, `413`, `422`, `500`. | Body ≤1 MiB; duration 15–240 minutes; overlaps rejected. |
 | `GET /api/appointments/{appointmentId}` | Read an appointment. | Valid session cookie required. | Positive integer path `appointmentId`; no body. | `200` with appointment. | `401`, `404`, `422`, `500`. | Positive integer identifier. |
 | `PATCH /api/appointments/{appointmentId}` | Change an active appointment. | Valid session cookie required. | Path ID; at least one editable appointment field in JSON. | `200` with updated appointment. | `400`, `401`, `404`, `409`, `413`, `422`, `500`. | Body ≤1 MiB; duration 15–240 minutes; overlaps rejected. |
 | `DELETE /api/appointments/{appointmentId}` | Soft-cancel an active appointment. | Valid session cookie required. | Positive integer path ID; no query/body. | `200` with status `KHACH_HUY`. | `401`, `404`, `409`, `422`, `500`. | No request body; row is retained. |
@@ -45,7 +46,9 @@ routes require an authenticated session, but the prototype has no technician/man
 
 Captured on 13/11/2026 against a disposable PostgreSQL Compose project on port 8001. The project and
 its test volume were removed after capture. Login credentials and the session cookie are omitted.
-`ticket_id` and timestamps below are from that isolated run.
+The captured response shows the disposable run's `long` account; the clean-clone deployment guide
+uses the `manager` account from `.env.example`. These were separate isolated Compose projects.
+`ticket_id` and timestamps below are from the disposable API-example run.
 
 ### Login
 
@@ -55,7 +58,7 @@ Request:
 POST /api/auth/login
 Content-Type: application/json
 
-{"username":"[configured demo user]","password":"[REDACTED]"}
+{"username":"long","password":"[REDACTED]"}
 ```
 
 Actual response: `200 OK`
@@ -112,3 +115,21 @@ The following actual responses came from the same run:
 
 These are real database-backed examples, not just fixture contracts. Owner identity is still supplied
 by the client for status updates; the 403 example does not prove session-bound ownership control.
+
+## Capture all 21 routes
+
+The route inventory above is counted from `src/app.js` and `src/routes/`: 3 service routes and 18
+`/api` routes. To capture request/response examples for all 21 distinct routes, start a disposable
+Compose stack with `.env`, then run:
+
+```shell
+npm run docs:api
+```
+
+The script uses the bootstrap credentials from `.env`, redacts password/cookie fields, and writes the
+live examples below this section. It creates two test tickets, assigns one, updates its status, and
+creates/updates/cancels an appointment; use a disposable database and remove its Compose volume after
+the capture. Do not include an actual `.env` value or session cookie in submitted evidence.
+
+<!-- BEGIN GENERATED LIVE API EXAMPLES -->
+<!-- END GENERATED LIVE API EXAMPLES -->

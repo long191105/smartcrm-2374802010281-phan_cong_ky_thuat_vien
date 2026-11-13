@@ -98,13 +98,17 @@ Check that both services report healthy:
 docker compose ps
 ```
 
-Expected: `db` and `app` show `Up` and `(healthy)`.
+Expected: `app` and `db` each show `Up (healthy)`. The `app` row publishes
+`0.0.0.0:3000->3000/tcp`; the `db` row shows only `5432/tcp` with no host mapping.
 
 Check API and database readiness:
 
 ```shell
-curl.exe -sS http://localhost:3000/health
+curl -s http://localhost:3000/health
 ```
+
+In Windows PowerShell, use `curl.exe -s http://localhost:3000/health` because `curl` may resolve
+to the `Invoke-WebRequest` alias.
 
 Expected JSON when using the sample default `APP_PORT=3000`:
 
@@ -118,7 +122,8 @@ Run all tests inside the application container:
 docker compose exec app npm test
 ```
 
-Expected: `78` tests pass, `0` fail, `0` skip, with exit code 0.
+Expected: exit code `0`; the test summary contains `# tests 78`, `# pass 78`, `# fail 0`,
+and `# skipped 0`.
 If `APP_PORT` differs from 3000, use that host port for the health request.
 
 ## Troubleshooting

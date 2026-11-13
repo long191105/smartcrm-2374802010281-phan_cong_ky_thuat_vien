@@ -1,173 +1,98 @@
-BT3 Docker validation — 2026-11-13
-=================================
+BT3 clean-clone Docker validation — 2026-11-13
+==============================================
 
-Environment
------------
+Target
+------
+Repository: https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien
+Tag: v1.0
+Resolved commit: d093b0d31dc27efd543e7ad3d64917f86b504cb8
 Docker Engine: 29.9.3
 Docker Compose: v5.7.0
-Project .env existed before the run; it was not overwritten.
-Configured host port: 8000 (APP_PORT in the existing local .env).
-The database has no published host port; Compose lists only its internal 5432/tcp.
+Image base: node:20-alpine
+Clone path: a new directory under the Windows temporary directory
+Environment: copied .env.example to .env; APP_PORT=3000
 
-Startup
--------
-Command: docker compose up -d --build
-Result: PASS (exit code 0)
-The first attempt could not locate docker-credential-desktop because this terminal's
-PATH predated the per-user Docker Desktop installation. Retrying with Docker's
-resources\bin added to this PowerShell process PATH succeeded. No machine-level
-PATH or credential settings were changed.
+Clean clone and startup
+-----------------------
+Commands:
+  git clone --branch v1.0 https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien.git <empty-directory>
+  copy .env.example .env
+  docker compose up -d --build
+
+Result: clone and Docker build/start succeeded. The database and application became healthy.
+The Docker CLI and credential helper were made available only in the current PowerShell process;
+no machine-wide PATH or credential settings were changed.
 
 Service status
 --------------
 Command: docker compose ps
 
-SERVICE   STATUS
-app       Up (healthy), 0.0.0.0:8000->3000/tcp
-db        Up (healthy), 5432/tcp only inside the Compose network
+SERVICE   STATUS                    PORTS
+app       Up (healthy)              0.0.0.0:3000->3000/tcp
+db        Up (healthy)              5432/tcp
+
+PostgreSQL has no published host port; 5432/tcp is internal to the Compose network.
 
 Health endpoint
 ---------------
-Command: curl.exe -sS -i http://localhost:8000/health
+Command: curl.exe -sS -i --max-time 10 http://localhost:3000/health
 Result: HTTP/1.1 200 OK
 Body: {"status":"ok","db":"up"}
-Screenshot: docs/screenshots/health-endpoint.png
 
 Container test suite
 --------------------
 Command: docker compose exec -T app npm test
 Result: exit code 0
-Tests: 77 total, 77 passed, 0 failed, 0 skipped.
-The app and database were healthy after the test run.
+Tests: 78 total, 78 passed, 0 failed, 0 skipped.
+The test runner ended with:
+  # tests 78
+  # pass 78
+  # fail 0
+  # skipped 0
 
-Repeat startup / seed idempotency
----------------------------------
-Recorded counts before and after restarting only the app container:
-appointment=0
-auth_user=1
-schema_migrations=4
-technician=2
-technician_skill=7
-ticket=18
-ticket_assignment=17
-ticket_status_log=18
-Result: counts matched exactly; app returned to healthy.
+Repeat migration and seed — C8
+------------------------------
+Commands:
+  docker compose exec -T app npm run migrate
+  docker compose exec -T app npm run seed
 
-Additional live checks
-----------------------
-Malformed JSON:
-Command: POST /api/auth/login with Content-Type: application/json and body "{"
-Result: HTTP 400, {"error":"INVALID_JSON","message":"Nội dung JSON không hợp lệ.","fields":{}}
+Migration result: 001–004 reported SKIP on repeat; seed reported OK.
+Before and after the repeated seed, counts were identical:
+  technician=2
+  technician_skill=7
+  ticket=18
+  ticket_assignment=17
+  ticket_status_log=18
+  appointment=0
+  auth_user=1
+  schema_migrations=4
 
-Application logs:
-Command: scan `docker compose logs app` for password|token|0[0-9]{9}
-Result: the scan found identifier-like internal pg method names
-(`authenticationCleartextPassword` and `authenticationMD5Password`), not credential
-values. Because the scan was not empty and the app emitted an internal error object
-during the outage test, this is not recorded as a clean log-security check.
+Invalid ticket filter
+---------------------
+Authenticated with the demo account from the clean clone, then requested:
+  GET /api/tickets?ticket_code=%27+OR+%271%27%3D%271
+Actual result: HTTP 422 VALIDATION_ERROR; no ticket list was returned.
+The API validates the ticket-code format before repository access.
 
-Database outage test:
-Procedure: stop db, request /health, start db, then restart app to restore the stack.
-Observed: app exited with code 1 after the PostgreSQL connection was interrupted;
-curl received HTTP 000 (connection refused), not the expected sanitized 503 response.
-The app log contained an unhandled pg pool error object/stack details.
-Recovery: after starting db and app, both services became healthy and /health returned
-HTTP 200 with {"status":"ok","db":"up"}.
-Conclusion: DB-down error handling and log sanitization are NOT PASS; application fix
-and re-test are required.
+PostgreSQL outage and recovery — BUG-04
+---------------------------------------
+Procedure: stop the isolated db service, request /health, start db, then request /health again.
+While db was stopped:
+  HTTP/1.1 503 Service Unavailable
+  {"status":"error","db":"down"}
+The app container remained Up. Its pool log contained only the generic message:
+  Unexpected database pool error.
+After db restarted, /health returned HTTP 200:
+  {"status":"ok","db":"up"}
+Both app and db returned to Up (healthy).
 
-Limitations
+Screenshots
 -----------
-This run used the existing working directory and its existing Docker volume, not a
-fresh clone of tag v1.0. The v1.0 tag has not been verified. A Docker Desktop or
-terminal screenshot of `docker compose ps` and the in-container test output has not
-been saved; only the real health endpoint screenshot is present.
-
-Retest after BUG-04 fix — 2026-11-13
-====================================
-
-Change:
-`src/db/pool.js` now handles idle-client `error` events and logs only a generic message.
-Regression coverage: `tests/db.pool.test.js`.
-
-Validation:
-- `npm test`: exit code 0; 78 passed, 0 failed, 0 skipped.
-- `npm run build`: PASS.
-- `docker compose up -d --build`: PASS; rebuilt the app image.
-- `docker compose ps`: app and db returned healthy after startup and recovery.
-- With `db` stopped, `curl.exe -sS -i --max-time 10 http://localhost:8000/health`
-  returned HTTP 503 and `{"status":"error","db":"down"}`; app remained Up.
-- After `docker compose start db`, the health endpoint returned
-  `{"status":"ok","db":"up"}` and the stack recovered.
-- Pool log during outage: `Unexpected database pool error.`; no error object or stack.
-- PowerShell scan `docker compose logs app | Select-String -Pattern 'password|token|0[0-9]{9}'`
-  returned `LOG_SCAN=empty`.
-- Redacted database query
-  `SELECT left(password_hash, 12) || '[REDACTED]' FROM auth_user LIMIT 1`
-  returned `scrypt$9adf0[REDACTED]`.
-
-API examples:
-A second, disposable Compose project (`bt3api`, host port 8001, separate database volume)
-captured actual login, ticket-create, assignment, 403, 409 and 422 responses. Its test
-ticket and database volume were removed with `docker compose -p bt3api down -v`; the
-primary project and its volume were untouched. Examples are in
-`docs/api-reference-bt3.md`.
-
-At this point in the initial validation, no clean clone had been run and tag v1.0 was unverified.
-The clean local-main clone is documented below; a fresh remote-tag clone is documented after it.
-- No saved terminal images for `docker compose ps`, container `npm test`, or clean-clone proof.
-- Per-test-case screenshots are still missing.
-
-Clean-clone validation — merged local main, 2026-11-13
-======================================================
-
-This check used a new temporary clone of the merged local `main` commit
-`07a6e0857dd42243d8618ee9f8f184700b964a71`, before the branch was pushed.
-It is a clean local-clone check, not a clone of GitHub or tag `v1.0`.
-The clone received `.env` by copying `.env.example`; its Compose project and database volume
-were isolated from the existing project.
-
-Docker CLI note:
-The installed Docker Desktop CLI and credential helper were outside this shell's PATH.
-Adding Docker Desktop's `resources\bin` directory to the current PowerShell process PATH
-allowed the commands to run. No machine-level PATH or Docker credential setting was changed.
-
-Results:
-- `docker compose up -d --build`: exit code 0; image built and both services started.
-- `docker compose ps`: app and db both `Up (healthy)`; app mapped `3000:3000`;
-  db exposed only internal `5432/tcp`.
-- `curl.exe -sS -i --max-time 10 http://localhost:3000/health`: HTTP 200,
-  `{"status":"ok","db":"up"}`.
-- `docker compose exec -T app npm test`: exit code 0; 78 passed, 0 failed, 0 skipped.
-- Re-ran `npm run migrate` and `npm run seed` inside app: migration files 001–004
-  reported `SKIP`; seed completed successfully.
-- PostgreSQL row counts before and after the repeat matched exactly:
-  appointment=0, auth_user=1, schema_migrations=4, technician=2,
-  technician_skill=7, ticket=18, ticket_assignment=17, ticket_status_log=18.
-
-No terminal screenshot was saved; command output is recorded here as text evidence only.
-
-Published-tag clean-clone validation — `v1.0`, 2026-11-13
-========================================================
-
-The public repository was freshly cloned with `git clone --branch v1.0`; at the time of this
-validation, the tag resolved to commit `a3ee3d8259b4ab08f9922c4d438adb0813964893`.
-`.env` was copied from `.env.example`.
-The tag page was accessible without authentication.
-The tag was subsequently moved to a documentation-only final-report commit; application source
-files were unchanged.
-
-Results:
-- `docker compose up -d --build`: exit code 0; image built and both services started.
-- `docker compose ps`: app and db both `Up (healthy)`; app mapped `3000:3000`;
-  db exposed only internal `5432/tcp`.
-- `curl.exe -sS -i --max-time 10 http://localhost:3000/health`: HTTP 200,
-  `{"status":"ok","db":"up"}`.
-- `docker compose exec -T app npm test`: exit code 0; 78 passed, 0 failed, 0 skipped.
-- Re-ran `npm run migrate` and `npm run seed`: migration files 001–004 reported `SKIP`;
-  seed completed successfully.
-- PostgreSQL counts before/after the repeat matched exactly:
-  appointment=0, auth_user=1, schema_migrations=4, technician=2,
-  technician_skill=7, ticket=18, ticket_assignment=17, ticket_status_log=18.
-
-No terminal screenshot was saved; command output is recorded here as text evidence only.
+This file is text evidence, not an image. Terminal screenshots are saved under
+docs/screenshots/:
+  docker-compose-ps-bt3.png — clean-clone services healthy; PostgreSQL has no host port.
+  npm-test-bt3.png — clean-clone npm test command; 78 passed, 0 failed.
+The earlier port-8000 health screenshot has been removed. health-port3000.png is a genuine browser
+capture of the local port-3000 endpoint, but it is not from the clean clone. A clean-clone port-3000
+health capture and a screenshot of the complete clean-clone setup procedure are still outstanding.
+Per-test-case screenshots are not required by the assignment.
