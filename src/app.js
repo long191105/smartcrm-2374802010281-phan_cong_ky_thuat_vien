@@ -40,8 +40,14 @@ function createApp({
     res.json({ service: 'smartcrm-l4-api', status: 'ok' });
   });
 
-  app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+  app.get('/health', async (req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      res.json({ status: 'ok', db: 'up' });
+    } catch {
+      console.error('Database health check failed.');
+      res.status(503).json({ status: 'error', db: 'down' });
+    }
   });
 
   app.get('/health/ready', async (req, res, next) => {
@@ -102,7 +108,7 @@ function createApp({
     }
 
     if (req.path === '/health/ready') {
-      console.error('Database readiness check failed:', error);
+      console.error('Database readiness check failed.');
       return res.status(503).json({
         error: 'DATABASE_UNAVAILABLE',
         message: 'Cơ sở dữ liệu hiện không khả dụng.',
@@ -110,7 +116,7 @@ function createApp({
       });
     }
 
-    console.error('Unhandled request error:', error);
+    console.error('Unhandled request error:', error.name);
     return res.status(500).json({
       error: 'INTERNAL_ERROR',
       message: 'Đã xảy ra lỗi hệ thống.',

@@ -1,5 +1,4 @@
 services:
-
   db:
     image: postgres:16-alpine
     environment:
@@ -8,21 +7,16 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
-      # PostgreSQL initdb only runs files at the root of this directory.
-      - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./migrations/002_tickets.sql:/docker-entrypoint-initdb.d/02-indexes.sql:ro
-      - ./migrations/004_ticket_crud.sql:/docker-entrypoint-initdb.d/03-ticket-crud.sql:ro
-      - ./seeds/001_demo.sql:/docker-entrypoint-initdb.d/04-demo.sql:ro
-      - ./migrations/003_auth.sql:/docker-entrypoint-initdb.d/05-auth.sql:ro
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./migrations:/opt/smartcrm/migrations:ro
+      - ./seeds:/opt/smartcrm/seeds:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 3s
       retries: 12
-    ports:
-      - "${DB_PORT:-5432}:5432"
 
-  api:
+  app:
     build: .
     environment:
       DB_HOST: db
@@ -30,14 +24,27 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      PORT: 8000
+      DATABASE_URL: ${DATABASE_URL:-}
+      APP_PORT: 3000
+      AUTH_BOOTSTRAP_USERNAME: ${AUTH_BOOTSTRAP_USERNAME}
+      AUTH_BOOTSTRAP_PASSWORD: ${AUTH_BOOTSTRAP_PASSWORD}
+      AUTH_BOOTSTRAP_DISPLAY_NAME: ${AUTH_BOOTSTRAP_DISPLAY_NAME}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
     depends_on:
       db:
-        # CHO db san sang nhan ket noi, khong chi cho container khoi dong.
         condition: service_healthy
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${APP_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then(async (r) => { const body = await r.json(); process.exit(r.ok && body.status === 'ok' && body.db === 'up' ? 0 : 1); }).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
 
 volumes:
   db_data:

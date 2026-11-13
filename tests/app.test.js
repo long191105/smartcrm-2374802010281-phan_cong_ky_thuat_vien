@@ -113,13 +113,20 @@ after(async () => {
   });
 });
 
-test('GET /health is a liveness check and does not require the database', async () => {
-  databaseAvailable = false;
+test('GET /health confirms the database is available', async () => {
   const response = await fetch(`${baseUrl}/health`);
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { status: 'ok' });
-  assert.equal(queryCount, 0);
+  assert.deepEqual(await response.json(), { status: 'ok', db: 'up' });
+  assert.equal(queryCount, 1);
+});
+
+test('GET /health returns 503 when the database is unavailable', async () => {
+  databaseAvailable = false;
+  const response = await fetch(`${baseUrl}/health`);
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { status: 'error', db: 'down' });
   databaseAvailable = true;
 });
 
@@ -131,7 +138,7 @@ test('GET /health/ready checks database connectivity', async () => {
     status: 'ok',
     database: 'connected',
   });
-  assert.equal(queryCount, 1);
+  assert.equal(queryCount, 3);
 });
 
 test('GET /health/ready returns 503 when the database is unavailable', async () => {

@@ -5,8 +5,8 @@ export default defineConfig(({ mode }) => {
   return {
     server: {
       proxy: {
-        '/api': env.VITE_API_PROXY_TARGET || 'http://localhost:8000',
-        '/health': env.VITE_API_PROXY_TARGET || 'http://localhost:8000',
+        '/api': env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+        '/health': env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
       },
     },
   };
