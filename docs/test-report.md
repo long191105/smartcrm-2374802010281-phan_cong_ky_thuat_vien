@@ -1,4 +1,8 @@
-# Test Report — BT2, Track SE
+# Historical Test Report — BT2, Track SE
+
+This section records the earlier BT2 baseline only. Current BT3 runtime evidence is in the
+13/11/2026 sections near the end of this file; older results below must not be interpreted as the
+current Docker or application status.
 
 **Cập nhật:** 11/11/2026
 
@@ -6,7 +10,8 @@
 (fix BUG-02), [abd0c17](https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien/commit/abd0c17)
 (boundary/auth tests), [ea7d840](https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien/commit/ea7d840)
 (Test Plan/Report, Test Design, README, CI, `.http`, báo cáo Word). Bản report được cập nhật tiếp
-trong commit metadata sau đó.
+trong các commit metadata. Bản Word và test suite được cập nhật sau đó; commit mới nhất là
+[aa13379](https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien/commit/aa133794aa2d8e4b6cc6e0422c0315debc996f08).
 
 **Lệnh:** `npm test` — exit code 0; **72 PASS, 0 FAIL, 0 SKIP**.
 
@@ -61,13 +66,102 @@ trong phiên này.
   liệu, không phải commit riêng chỉ cho BUG-01. Phiên này chỉ tái hiện và sửa thêm BUG-02; các ca 403,
   404, 422 và biên 14/15 đều khớp hành vi đã thiết kế, không phải bug mới. Chưa có căn cứ để ghi nhận
   thêm hai lỗi ứng dụng thật; không bịa bug để đủ số lượng.
+- Lần chạy CI đầu tiên phát hiện hai test bị khai báo lồng trong test khác và bị Node hủy trước khi
+  chạy độc lập. Đã tách test và xác nhận lại thành công trong hai commit `041c0a5` và `aa13379`.
+  Đây là lỗi cấu trúc test/CI, không tính là bug chức năng thứ ba của ứng dụng.
 - Không có Docker daemon/`psql`; PostgreSQL integration thật chưa chạy lại. Không kiểm thử tích hợp
   trực tiếp L2→L4 vì mã/endpoint L2 không có trong repo.
 - REST Client smoke file: `tests/api-smoke.http`. CI workflow mới thêm tại `.github/workflows/ci.yml`;
-  chưa có GitHub Actions run để xác nhận.
+  GitHub Actions run [#4](https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien/actions/runs/42958347352)
+  đã PASS trên Node 20 với `npm ci`, `npm test` và `npm run build`.
 - Chưa tạo GitHub Release v0.2. Branch hiện là `dev`; cần chốt commit/tag sau khi ảnh terminal được
   tạo và tài liệu được review.
 
-**Kết luận:** `npm test` PASS (72/72) và build PASS. Checklist nộp vẫn **CHƯA ĐẠT ĐỦ** vì thiếu ảnh test
-case, PostgreSQL integration hiện tại, ≥3 bug thật đã sửa bằng commit tách biệt (hiện chỉ xác minh
-được BUG-02 trong phiên này), và GitHub Release v0.2 hoặc quyết định phát hành cuối.
+**Kết luận:** `npm test` PASS (72/72), `npm run build` PASS và CI PASS. Checklist nộp vẫn
+**CHƯA ĐẠT ĐỦ** vì thiếu ảnh test case, PostgreSQL integration hiện tại, ≥3 bug ứng dụng thật đã sửa
+bằng commit tách biệt (hiện có BUG-01 và BUG-02; BUG-01 không có commit riêng), và GitHub Release
+v0.2 hoặc quyết định phát hành cuối.
+
+## Historical BT3 evidence snapshot — 12/11/2026
+
+The BT2 conclusion above is retained as a historical snapshot. After the BT3 packaging and dependency
+changes, the current Windows/Node.js 24.21.0 run completed `npm test` with **77 PASS, 0 FAIL, 0 SKIP**;
+`npm run build`, `npm ci`, `npm audit`, and `npm audit --omit=dev` also passed. Docker/PostgreSQL live
+integration was not run because Docker and `psql` are unavailable here. The following 12 representative
+cases are selected from the 77-test run; they cover functional, validation, authorization, error-handling,
+boundary, and database-runner behavior.
+
+| Mã | Tiền điều kiện | Các bước | Dữ liệu thử | Kết quả mong đợi | Ưu tiên | Kết quả thực tế | PASS/FAIL |
+|---|---|---|---|---|---|---|---|
+| BT3-01 | Functional: auth test server and manager fixture | Login, inspect response and cookie | Valid manager fixture | 200; user returned; HttpOnly session cookie | High | HTTP test verified user response and cookie attributes | PASS |
+| BT3-02 | Authorization: no session cookie | Request `GET /api/tickets` | No cookie | 401; ticket service is not called | High | HTTP test returned 401; service call count remained zero | PASS |
+| BT3-03 | Functional: waiting ticket and overloaded technician | Confirm assignment | `BH-900001/2025`, `KT002`, `confirm_overload=true` | 201; assignment and status/history are atomic | High | Repository test-double verified assignment transaction | PASS |
+| BT3-04 | Validation: technician skill below minimum | Attempt assignment | `KT002`, proficiency 2 | 409 `SKILL_MISMATCH`; no assignment insert | High | Repository test verified conflict and no insert | PASS |
+| BT3-05 | Functional/error: existing technician time slot | Create overlapping appointment | 60-minute overlapping slot | 409; rollback; no duplicate reservation | High | Appointment repository test verified rollback using test doubles | PASS |
+| BT3-06 | Authorization: assigned technician is KT002 | Update status as another actor | `changed_by=KT999` | 403; no status/history change | High | HTTP test returned 403 with no side effects; actor is client-supplied, so this is not identity-bound ownership proof | PASS* |
+| BT3-07 | Validation: API session established | Create ticket with missing required fields | `{}` | 422 `VALIDATION_ERROR`; repository not called | High | API returned 422 and identified invalid fields; rubric's 400 expectation remains a discrepancy | PASS** |
+| BT3-08 | Error handling: authenticated API; valid but absent ticket code | Read ticket | `BH-900099/2025` | 404; sanitized JSON without stack | Medium | HTTP test returned 404 with the common error envelope | PASS |
+| BT3-09 | Error handling: JSON endpoint | Send malformed JSON | `{"ticket_code":` | 400 `INVALID_JSON`; no parser stack in response | Medium | HTTP regression test passed with sanitized response | PASS |
+| BT3-10 | Boundary: 1 MiB JSON parser limit | Send body larger than limit | JSON body 1 MiB + 11 bytes | 413 `PAYLOAD_TOO_LARGE`; no parser details | Medium | HTTP regression returned 413; regression was 500 before BUG-02 fix | PASS |
+| BT3-11 | Database behavior: migration runner with test database double | Apply migrations twice | Migration files 001–004 | Second run skips unchanged checksums | Medium | Runner test passed; not a live PostgreSQL run | PASS*** |
+| BT3-12 | Database behavior: seed runner with test database double | Run seed twice | Demo fixtures | Second run does not duplicate records | Medium | Runner and SQL guard tests passed; not a live PostgreSQL count | PASS*** |
+
+`*` A different client-supplied `changed_by` is rejected, but the actor is not bound to the session.
+`**` PASS is against the implemented 422 contract; it does not satisfy the rubric's requested 400.
+`***` Test-double result only; fresh Docker/PostgreSQL evidence remains outstanding.
+
+Each test-case screenshot is still pending. The existing UI images under `docs/evidence/` are not
+terminal test evidence. To rerun an individual case, for example:
+
+```shell
+node --test --test-name-pattern="oversized JSON requests" tests/app.test.js
+```
+
+Docker packaging is prepared but not runtime-verified; capture `docker compose ps`, `/health`, and
+`docker compose exec app npm test` under `docs/screenshots/` after running on a machine with Docker.
+
+## Initial live Docker validation — 13/11/2026 (before BUG-04 fix)
+
+Docker Desktop was available for this run (Engine 29.9.3, Compose v5.7.0). The existing `.env` was
+left unchanged and configured host port 8000, so the live health URL was
+`http://localhost:8000/health` rather than the sample default 3000.
+
+| Check | Actual result |
+|---|---|
+| `docker compose up -d --build` | PASS, exit code 0; `postgres:16-alpine` pulled and app image built. |
+| `docker compose ps` | PASS; both `db` and `app` Up (healthy). DB publishes no host port; Compose shows only internal `5432/tcp`. |
+| `curl.exe -sS -i http://localhost:8000/health` | PASS; HTTP 200 and `{"status":"ok","db":"up"}`. A real browser screenshot is saved as `docs/screenshots/health-endpoint.png`. |
+| `docker compose exec -T app npm test` | PASS; 77 tests, 77 passed, 0 failed, 0 skipped; exit code 0. |
+| Repeat application startup | PASS; after restarting only `app`, the database counts were unchanged: 2 technicians, 7 technician-skill rows, 18 tickets, 17 assignments, 18 status-history rows, 0 appointments, 1 auth user, and 4 migrations. |
+| Malformed JSON | PASS; POST with body `{` returned HTTP 400 `INVALID_JSON` with a generic JSON response. |
+| Log scan | NOT PASS; the grep-like scan found internal identifiers `authenticationCleartextPassword` and `authenticationMD5Password` (not secret values); logs also contained an internal pg error object during the outage test. |
+| PostgreSQL outage | FAIL; stopping `db` caused the app process to exit with code 1. `/health` received HTTP 000 (connection refused), not the sanitized 503 tested by the HTTP test double. The database and app were restarted and returned to healthy. |
+
+At the time of this initial run, checklist items 5 and 6 were **CHƯA LÀM**. That pre-fix result is
+historical; the BUG-04 retest below supersedes it and passes the live database-down and log checks.
+The current app container is running again and healthy. The full command output is recorded in
+`docs/evidence/16-docker-validation.txt`.
+
+This was a run in the existing working directory and volume, not a clean clone of the `v1.0` tag.
+That tag remains unverified. Only the health endpoint screenshot is stored as a new image; `docker
+compose ps` and test output are real command results but do not yet have saved terminal screenshots.
+
+## Live retest — 13/11/2026 (after BUG-04 fix)
+
+The PostgreSQL pool now has a sanitized `error` listener. The original outage result above is
+historical and was re-tested after the change:
+
+| Check | Actual result |
+|---|---|
+| `npm test` | PASS; 78 tests, 78 passed, 0 failed, 0 skipped; exit code 0. |
+| `npm run build` | PASS. |
+| `docker compose up -d --build` | PASS; rebuilt the app image and both services became healthy. |
+| PostgreSQL outage | PASS; after stopping `db`, app remained running and `GET /health` returned HTTP 503 with `{"status":"error","db":"down"}`. |
+| PostgreSQL recovery | PASS; after starting `db`, `/health` returned `{"status":"ok","db":"up"}` and both services returned healthy. |
+| Log scan | PASS; `docker compose logs app` piped through the case-insensitive `password|token|0[0-9]{9}` pattern returned no matches. The pool wrote only `Unexpected database pool error.` |
+| Auth hash | The live query returned the prefix `scrypt$9adf0`; the rest of the hash is redacted. This is scrypt, not bcrypt `$2b$10$`. |
+| API examples | Login, ticket creation, assignment, 403, 409 and 422 examples were captured from a separate disposable PostgreSQL Compose project. Its ticket data and volume were removed after capture. |
+
+Checklist items 5 and 6 are now **ĐÃ LÀM** based on these retests. Owner-based access control remains
+**CHƯA LÀM** because the actor identifier is client-supplied. Clean clone/tag verification and saved
+terminal/test-case screenshots are still outstanding.

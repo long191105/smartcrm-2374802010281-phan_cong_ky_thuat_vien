@@ -167,3 +167,17 @@ khi rà soát được ghi rõ là "Tự phát hiện".
 - **Ảnh hưởng:** `docs/test-plan.md` và `docs/test-report.md` dùng 422 làm kết quả mong đợi, ghi rõ giới
   hạn A01 và không tuyên bố hệ thống phù hợp production; muốn bảo đảm quyền kỹ thuật viên phải có mô
   hình tài khoản/vai trò riêng và thay đổi ngoài phạm vi hiện tại.
+
+## Sau rà soát đóng gói BT3 (12/11/2026)
+
+### TD-13 Khởi động lặp an toàn và chỉ publish API
+
+- **Tự phát hiện:** Compose cũ publish cổng PostgreSQL ra host, dùng tên service `api`, chưa có healthcheck
+  cho ứng dụng, và cần chạy thủ công bước migrate/seed/bootstrap.
+- **Quyết định:** SỬA; đổi service thành `app`, bỏ host port DB, thêm healthcheck `/health`, chờ DB healthy
+  và khởi tạo migration/seed/tài khoản trong startup.
+- **Lý do:** Máy trắng phải tự khởi động bằng hai lệnh; lần chạy lại không làm trùng fixture; database
+  chỉ được truy cập trên mạng Compose.
+- **Ảnh hưởng:** `Dockerfile`, `docker-compose.yml`, `db/init/`, `src/config.js`,
+  `src/db/initialize.js`, `src/app.js`, `docs/deployment-guide.md`. Xác minh container thật vẫn chờ do
+  Docker chưa có trong môi trường tác giả.
