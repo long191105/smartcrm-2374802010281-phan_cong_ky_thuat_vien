@@ -163,5 +163,23 @@ historical and was re-tested after the change:
 | API examples | Login, ticket creation, assignment, 403, 409 and 422 examples were captured from a separate disposable PostgreSQL Compose project. Its ticket data and volume were removed after capture. |
 
 Checklist items 5 and 6 are now **ĐÃ LÀM** based on these retests. Owner-based access control remains
-**CHƯA LÀM** because the actor identifier is client-supplied. Clean clone/tag verification and saved
-terminal/test-case screenshots are still outstanding.
+**CHƯA LÀM** because the actor identifier is client-supplied. The clean local clone of merged `main`
+passed below; verification from the remote `v1.0` tag and saved terminal/test-case screenshots remain
+outstanding.
+
+## Clean-clone validation — merged local `main`, 13/11/2026
+
+The merged release candidate was cloned into a new temporary directory from local `main` before
+push/tag. `.env` was created from `.env.example`; no existing project database volume was reused.
+
+| Check | Actual result |
+|---|---|
+| `docker compose up -d --build` | PASS, exit code 0; image built and both services started. |
+| `docker compose ps` | PASS; `app` and `db` were `Up (healthy)`. The app mapped host port 3000; PostgreSQL showed only internal `5432/tcp`. |
+| `GET http://localhost:3000/health` | PASS; HTTP 200, `{"status":"ok","db":"up"}`. |
+| `docker compose exec -T app npm test` | PASS, exit code 0; 78 passed, 0 failed, 0 skipped. |
+| Re-run `npm run migrate` and `npm run seed` in the app container | PASS; migrations 001–004 were skipped by checksum; seed completed. Counts before/after matched: 0 appointments, 1 auth user, 4 migrations, 2 technicians, 7 technician-skill rows, 18 tickets, 17 assignments, and 18 status-history rows. |
+
+This verifies a clean local clone of the merged `main`, not a clone of GitHub or tag `v1.0`.
+`v1.0` is not yet created/pushed. The health screenshot remains available, but terminal screenshots
+for `docker compose ps` and `npm test`, and per-test-case screenshots, have not been saved.

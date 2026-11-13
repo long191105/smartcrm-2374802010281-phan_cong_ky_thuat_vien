@@ -113,7 +113,37 @@ ticket and database volume were removed with `docker compose -p bt3api down -v`;
 primary project and its volume were untouched. Examples are in
 `docs/api-reference-bt3.md`.
 
-Still pending:
-- No clean clone of v1.0/main was run; tag v1.0 is unverified.
+At this point in the initial validation, no clean clone had been run and tag v1.0 was unverified.
+The clean local-main clone is documented below; the remote v1.0 tag remains unverified.
 - No saved terminal images for `docker compose ps`, container `npm test`, or clean-clone proof.
 - Per-test-case screenshots are still missing.
+
+Clean-clone validation — merged local main, 2026-11-13
+======================================================
+
+This check used a new temporary clone of the merged local `main` commit
+`07a6e0857dd42243d8618ee9f8f184700b964a71`, before the branch was pushed.
+It is a clean local-clone check, not a clone of GitHub or tag `v1.0`.
+The clone received `.env` by copying `.env.example`; its Compose project and database volume
+were isolated from the existing project.
+
+Docker CLI note:
+The installed Docker Desktop CLI and credential helper were outside this shell's PATH.
+Adding Docker Desktop's `resources\bin` directory to the current PowerShell process PATH
+allowed the commands to run. No machine-level PATH or Docker credential setting was changed.
+
+Results:
+- `docker compose up -d --build`: exit code 0; image built and both services started.
+- `docker compose ps`: app and db both `Up (healthy)`; app mapped `3000:3000`;
+  db exposed only internal `5432/tcp`.
+- `curl.exe -sS -i --max-time 10 http://localhost:3000/health`: HTTP 200,
+  `{"status":"ok","db":"up"}`.
+- `docker compose exec -T app npm test`: exit code 0; 78 passed, 0 failed, 0 skipped.
+- Re-ran `npm run migrate` and `npm run seed` inside app: migration files 001–004
+  reported `SKIP`; seed completed successfully.
+- PostgreSQL row counts before and after the repeat matched exactly:
+  appointment=0, auth_user=1, schema_migrations=4, technician=2,
+  technician_skill=7, ticket=18, ticket_assignment=17, ticket_status_log=18.
+
+No terminal screenshot was saved; command output is recorded here as text evidence only.
+The remote `v1.0` tag and clean-clone test from that tag remain pending.
