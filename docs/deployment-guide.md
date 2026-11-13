@@ -24,7 +24,7 @@ Run each command from the directory in which you want the repository:
 1. Clone the repository:
 
    ```shell
-   git clone https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien.git
+   git clone --branch v1.0 https://github.com/long191105/smartcrm-2374802010281-phan_cong_ky_thuat_vien.git
    ```
 
 2. Enter the project directory:

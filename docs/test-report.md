@@ -143,8 +143,9 @@ The current app container is running again and healthy. The full command output 
 `docs/evidence/16-docker-validation.txt`.
 
 This was a run in the existing working directory and volume, not a clean clone of the `v1.0` tag.
-That tag remains unverified. Only the health endpoint screenshot is stored as a new image; `docker
-compose ps` and test output are real command results but do not yet have saved terminal screenshots.
+At that point, the tag was still unverified. Only the health endpoint screenshot is stored as a new
+image; `docker compose ps` and test output are real command results but do not have saved terminal
+screenshots.
 
 ## Live retest — 13/11/2026 (after BUG-04 fix)
 
@@ -163,14 +164,14 @@ historical and was re-tested after the change:
 | API examples | Login, ticket creation, assignment, 403, 409 and 422 examples were captured from a separate disposable PostgreSQL Compose project. Its ticket data and volume were removed after capture. |
 
 Checklist items 5 and 6 are now **ĐÃ LÀM** based on these retests. Owner-based access control remains
-**CHƯA LÀM** because the actor identifier is client-supplied. The clean local clone of merged `main`
-passed below; verification from the remote `v1.0` tag and saved terminal/test-case screenshots remain
-outstanding.
+**CHƯA LÀM** because the actor identifier is client-supplied. The public `v1.0` tag has been
+clean-clone tested; terminal/test-case screenshots remain outstanding.
 
-## Clean-clone validation — merged local `main`, 13/11/2026
+## Clean-clone validation — public `v1.0` tag, 13/11/2026
 
-The merged release candidate was cloned into a new temporary directory from local `main` before
-push/tag. `.env` was created from `.env.example`; no existing project database volume was reused.
+The published repository was cloned into a new temporary directory using branch/tag `v1.0`.
+`.env` was created from `.env.example`; no existing project database volume was reused. The tag page
+was accessible without authentication.
 
 | Check | Actual result |
 |---|---|
@@ -180,6 +181,6 @@ push/tag. `.env` was created from `.env.example`; no existing project database v
 | `docker compose exec -T app npm test` | PASS, exit code 0; 78 passed, 0 failed, 0 skipped. |
 | Re-run `npm run migrate` and `npm run seed` in the app container | PASS; migrations 001–004 were skipped by checksum; seed completed. Counts before/after matched: 0 appointments, 1 auth user, 4 migrations, 2 technicians, 7 technician-skill rows, 18 tickets, 17 assignments, and 18 status-history rows. |
 
-This verifies a clean local clone of the merged `main`, not a clone of GitHub or tag `v1.0`.
-`v1.0` is not yet created/pushed. The health screenshot remains available, but terminal screenshots
-for `docker compose ps` and `npm test`, and per-test-case screenshots, have not been saved.
+The fresh clone resolved tag `v1.0` to the published release commit and passed the checks above.
+The health screenshot remains available, but terminal screenshots for `docker compose ps` and
+`npm test`, and per-test-case screenshots, have not been saved.
