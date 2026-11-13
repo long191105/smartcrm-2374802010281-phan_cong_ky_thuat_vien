@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
 const { createApp } = require('../src/app');
+const { TicketRepository } = require('../src/repositories/ticket.repository');
 const { TicketService } = require('../src/services/ticket-l4.service');
 
 const testUser = { username: 'manager', displayName: 'Test Manager' };
@@ -112,13 +113,20 @@ after(async () => {
   });
 });
 
-test('GET /health is a liveness check and does not require the database', async () => {
-  databaseAvailable = false;
+test('GET /health confirms the database is available', async () => {
   const response = await fetch(`${baseUrl}/health`);
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { status: 'ok' });
-  assert.equal(queryCount, 0);
+  assert.deepEqual(await response.json(), { status: 'ok', db: 'up' });
+  assert.equal(queryCount, 1);
+});
+
+test('GET /health returns 503 when the database is unavailable', async () => {
+  databaseAvailable = false;
+  const response = await fetch(`${baseUrl}/health`);
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { status: 'error', db: 'down' });
   databaseAvailable = true;
 });
 
@@ -130,7 +138,7 @@ test('GET /health/ready checks database connectivity', async () => {
     status: 'ok',
     database: 'connected',
   });
-  assert.equal(queryCount, 1);
+  assert.equal(queryCount, 3);
 });
 
 test('GET /health/ready returns 503 when the database is unavailable', async () => {
@@ -199,6 +207,7 @@ test('unknown routes return a JSON 404 response', async () => {
   const response = await fetch(`${baseUrl}/not-found`);
 
   assert.equal(response.status, 404);
+  assert.equal(response.headers.get('x-powered-by'), null);
   assert.deepEqual(await response.json(), {
     error: 'NOT_FOUND',
     message: 'Không tìm thấy tài nguyên.',
@@ -221,45 +230,24 @@ test('malformed JSON is reported as a client error', async () => {
   });
 });
 
+test('oversized JSON requests return 413 instead of an internal server error', async () => {
+  const response = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ data: 'x'.repeat(1024 * 1024) }),
+  });
+
+  assert.equal(response.status, 413);
+  assert.deepEqual(await response.json(), {
+    error: 'PAYLOAD_TOO_LARGE',
+    message: 'Nội dung gửi lên vượt giới hạn cho phép.',
+    fields: {},
+  });
+});
+
 test('GET /api/tickets forwards filters and returns the list contract', async () => {
   const response = await fetch(`${baseUrl}/api/tickets?status=MOI&center_code=TT04&ticket_code=BH-900001%2F2025`, {
     headers: sessionHeaders,
-  });
-
-  test('ticket collection and item routes expose create, read, update, and safe close operations', async () => {
-    const created = await fetch(`${baseUrl}/api/tickets`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...sessionHeaders },
-      body: JSON.stringify({ ticket_code: 'BH-900099/2025' }),
-    });
-    assert.equal(created.status, 201);
-    assert.deepEqual(await created.json(), {
-      ticket_code: 'BH-900099/2025',
-      status: 'MOI',
-    });
-    assert.equal(ticketServiceCalls.at(-1).method, 'ticket-create');
-
-    const code = encodeURIComponent('BH-900099/2025');
-    const read = await fetch(`${baseUrl}/api/tickets/${code}`, { headers: sessionHeaders });
-    assert.equal(read.status, 200);
-    assert.deepEqual(await read.json(), { ticket_code: 'BH-900099/2025', status: 'MOI' });
-
-    const updated = await fetch(`${baseUrl}/api/tickets/${code}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json', ...sessionHeaders },
-      body: JSON.stringify({ priority: 'CAO' }),
-    });
-    assert.equal(updated.status, 200);
-    assert.deepEqual(await updated.json(), { ticket_code: 'BH-900099/2025', priority: 'CAO' });
-
-    const closed = await fetch(`${baseUrl}/api/tickets/${code}`, {
-      method: 'DELETE',
-      headers: { 'content-type': 'application/json', ...sessionHeaders },
-      body: JSON.stringify({ closed_by: 'manager' }),
-    });
-    assert.equal(closed.status, 200);
-    assert.deepEqual(await closed.json(), { ticket_code: 'BH-900099/2025', status: 'DA_DONG' });
-    assert.equal(ticketServiceCalls.at(-1).method, 'ticket-close');
   });
 
   assert.equal(response.status, 200);
@@ -268,6 +256,42 @@ test('GET /api/tickets forwards filters and returns the list contract', async ()
     method: 'list',
     query: { status: 'MOI', center_code: 'TT04', ticket_code: 'BH-900001/2025' },
   });
+});
+
+test('ticket collection and item routes expose create, read, update, and safe close operations', async () => {
+  const created = await fetch(`${baseUrl}/api/tickets`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...sessionHeaders },
+    body: JSON.stringify({ ticket_code: 'BH-900099/2025' }),
+  });
+  assert.equal(created.status, 201);
+  assert.deepEqual(await created.json(), {
+    ticket_code: 'BH-900099/2025',
+    status: 'MOI',
+  });
+  assert.equal(ticketServiceCalls.at(-1).method, 'ticket-create');
+
+  const code = encodeURIComponent('BH-900099/2025');
+  const read = await fetch(`${baseUrl}/api/tickets/${code}`, { headers: sessionHeaders });
+  assert.equal(read.status, 200);
+  assert.deepEqual(await read.json(), { ticket_code: 'BH-900099/2025', status: 'MOI' });
+
+  const updated = await fetch(`${baseUrl}/api/tickets/${code}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...sessionHeaders },
+    body: JSON.stringify({ priority: 'CAO' }),
+  });
+  assert.equal(updated.status, 200);
+  assert.deepEqual(await updated.json(), { ticket_code: 'BH-900099/2025', priority: 'CAO' });
+
+  const closed = await fetch(`${baseUrl}/api/tickets/${code}`, {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json', ...sessionHeaders },
+    body: JSON.stringify({ closed_by: 'manager' }),
+  });
+  assert.equal(closed.status, 200);
+  assert.deepEqual(await closed.json(), { ticket_code: 'BH-900099/2025', status: 'DA_DONG' });
+  assert.equal(ticketServiceCalls.at(-1).method, 'ticket-close');
 });
 
 test('POST assignment accepts an encoded ticket code containing a slash', async () => {
@@ -302,9 +326,15 @@ test('POST assignment accepts an encoded ticket code containing a slash', async 
 });
 
 test('assignment input errors use the documented JSON error format', async () => {
+  let createCalls = 0;
   const validationServer = createApp({
     pool: { async query() { return { rows: [] }; } },
-    ticketService: new TicketService({}),
+    ticketService: new TicketService({
+      async createTicket() {
+        createCalls += 1;
+        assert.fail('invalid input must not reach the repository');
+      },
+    }),
     authService,
   }).listen(0);
   await new Promise((resolve) => validationServer.once('listening', resolve));
@@ -337,9 +367,100 @@ test('assignment input errors use the documented JSON error format', async () =>
     const createError = await invalidCreate.json();
     assert.equal(createError.error, 'VALIDATION_ERROR');
     assert.ok(Object.hasOwn(createError.fields, 'ticket_code'));
+    assert.equal(createCalls, 0);
   } finally {
     await new Promise((resolve, reject) => {
       validationServer.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+});
+
+test('HTTP status update rejects a different assigned technician without side effects', async () => {
+  const queries = [];
+  const client = {
+    async query(sql) {
+      const query = sql.trim();
+      queries.push(query);
+      if (query.startsWith('SELECT ticket.ticket_id')) {
+        return {
+          rows: [{
+            ticket_id: 900001,
+            status: 'DA_PHAN_CONG',
+            technician_code: 'KT002',
+          }],
+        };
+      }
+      return { rows: [], rowCount: 1 };
+    },
+    release() {},
+  };
+  const statusServer = createApp({
+    pool: {
+      async query() { return { rows: [] }; },
+      async connect() { return client; },
+    },
+    ticketService: new TicketService(new TicketRepository({ async connect() { return client; } })),
+    authService,
+  }).listen(0);
+  await new Promise((resolve) => statusServer.once('listening', resolve));
+
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${statusServer.address().port}/api/tickets/BH-900001%2F2025/status`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', ...sessionHeaders },
+        body: JSON.stringify({ status: 'DANG_XU_LY', changed_by: 'KT999' }),
+      },
+    );
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), {
+      error: 'FORBIDDEN',
+      message: 'Chỉ kỹ thuật viên đang phụ trách mới được cập nhật phiếu.',
+      fields: {},
+    });
+    assert.ok(queries.includes('ROLLBACK'));
+    assert.ok(!queries.some((query) => query.startsWith('UPDATE ticket')));
+    assert.ok(!queries.some((query) => query.startsWith('INSERT INTO ticket_status_log')));
+  } finally {
+    await new Promise((resolve, reject) => {
+      statusServer.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+});
+
+test('HTTP ticket lookup returns a sanitized 404 for a valid but missing ticket code', async () => {
+  const missingTicketServer = createApp({
+    pool: {
+      async query() {
+        return { rows: [{ ticket_id: null, total: 0 }] };
+      },
+    },
+    ticketService: new TicketService(new TicketRepository({
+      async query() {
+        return { rows: [{ ticket_id: null, total: 0 }] };
+      },
+    })),
+    authService,
+  }).listen(0);
+  await new Promise((resolve) => missingTicketServer.once('listening', resolve));
+
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${missingTicketServer.address().port}/api/tickets/BH-900099%2F2025`,
+      { headers: sessionHeaders },
+    );
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), {
+      error: 'NOT_FOUND',
+      message: 'Không tìm thấy phiếu bảo hành.',
+      fields: {},
+    });
+  } finally {
+    await new Promise((resolve, reject) => {
+      missingTicketServer.close((error) => (error ? reject(error) : resolve()));
     });
   }
 });

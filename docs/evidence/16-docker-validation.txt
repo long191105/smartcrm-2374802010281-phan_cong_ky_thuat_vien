@@ -1,0 +1,119 @@
+BT3 Docker validation — 2026-11-13
+=================================
+
+Environment
+-----------
+Docker Engine: 29.9.3
+Docker Compose: v5.7.0
+Project .env existed before the run; it was not overwritten.
+Configured host port: 8000 (APP_PORT in the existing local .env).
+The database has no published host port; Compose lists only its internal 5432/tcp.
+
+Startup
+-------
+Command: docker compose up -d --build
+Result: PASS (exit code 0)
+The first attempt could not locate docker-credential-desktop because this terminal's
+PATH predated the per-user Docker Desktop installation. Retrying with Docker's
+resources\bin added to this PowerShell process PATH succeeded. No machine-level
+PATH or credential settings were changed.
+
+Service status
+--------------
+Command: docker compose ps
+
+SERVICE   STATUS
+app       Up (healthy), 0.0.0.0:8000->3000/tcp
+db        Up (healthy), 5432/tcp only inside the Compose network
+
+Health endpoint
+---------------
+Command: curl.exe -sS -i http://localhost:8000/health
+Result: HTTP/1.1 200 OK
+Body: {"status":"ok","db":"up"}
+Screenshot: docs/screenshots/health-endpoint.png
+
+Container test suite
+--------------------
+Command: docker compose exec -T app npm test
+Result: exit code 0
+Tests: 77 total, 77 passed, 0 failed, 0 skipped.
+The app and database were healthy after the test run.
+
+Repeat startup / seed idempotency
+---------------------------------
+Recorded counts before and after restarting only the app container:
+appointment=0
+auth_user=1
+schema_migrations=4
+technician=2
+technician_skill=7
+ticket=18
+ticket_assignment=17
+ticket_status_log=18
+Result: counts matched exactly; app returned to healthy.
+
+Additional live checks
+----------------------
+Malformed JSON:
+Command: POST /api/auth/login with Content-Type: application/json and body "{"
+Result: HTTP 400, {"error":"INVALID_JSON","message":"Nội dung JSON không hợp lệ.","fields":{}}
+
+Application logs:
+Command: scan `docker compose logs app` for password|token|0[0-9]{9}
+Result: the scan found identifier-like internal pg method names
+(`authenticationCleartextPassword` and `authenticationMD5Password`), not credential
+values. Because the scan was not empty and the app emitted an internal error object
+during the outage test, this is not recorded as a clean log-security check.
+
+Database outage test:
+Procedure: stop db, request /health, start db, then restart app to restore the stack.
+Observed: app exited with code 1 after the PostgreSQL connection was interrupted;
+curl received HTTP 000 (connection refused), not the expected sanitized 503 response.
+The app log contained an unhandled pg pool error object/stack details.
+Recovery: after starting db and app, both services became healthy and /health returned
+HTTP 200 with {"status":"ok","db":"up"}.
+Conclusion: DB-down error handling and log sanitization are NOT PASS; application fix
+and re-test are required.
+
+Limitations
+-----------
+This run used the existing working directory and its existing Docker volume, not a
+fresh clone of tag v1.0. The v1.0 tag has not been verified. A Docker Desktop or
+terminal screenshot of `docker compose ps` and the in-container test output has not
+been saved; only the real health endpoint screenshot is present.
+
+Retest after BUG-04 fix — 2026-11-13
+====================================
+
+Change:
+`src/db/pool.js` now handles idle-client `error` events and logs only a generic message.
+Regression coverage: `tests/db.pool.test.js`.
+
+Validation:
+- `npm test`: exit code 0; 78 passed, 0 failed, 0 skipped.
+- `npm run build`: PASS.
+- `docker compose up -d --build`: PASS; rebuilt the app image.
+- `docker compose ps`: app and db returned healthy after startup and recovery.
+- With `db` stopped, `curl.exe -sS -i --max-time 10 http://localhost:8000/health`
+  returned HTTP 503 and `{"status":"error","db":"down"}`; app remained Up.
+- After `docker compose start db`, the health endpoint returned
+  `{"status":"ok","db":"up"}` and the stack recovered.
+- Pool log during outage: `Unexpected database pool error.`; no error object or stack.
+- PowerShell scan `docker compose logs app | Select-String -Pattern 'password|token|0[0-9]{9}'`
+  returned `LOG_SCAN=empty`.
+- Redacted database query
+  `SELECT left(password_hash, 12) || '[REDACTED]' FROM auth_user LIMIT 1`
+  returned `scrypt$9adf0[REDACTED]`.
+
+API examples:
+A second, disposable Compose project (`bt3api`, host port 8001, separate database volume)
+captured actual login, ticket-create, assignment, 403, 409 and 422 responses. Its test
+ticket and database volume were removed with `docker compose -p bt3api down -v`; the
+primary project and its volume were untouched. Examples are in
+`docs/api-reference-bt3.md`.
+
+Still pending:
+- No clean clone of v1.0/main was run; tag v1.0 is unverified.
+- No saved terminal images for `docker compose ps`, container `npm test`, or clean-clone proof.
+- Per-test-case screenshots are still missing.

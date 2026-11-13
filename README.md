@@ -10,6 +10,18 @@ cơ sở dữ liệu PostgreSQL và giao diện Vite. Giao diện desktop có ba
 Nguồn dữ liệu nghiệp vụ, tên trường và quy tắc được mô tả trong [`docs/srs.md`](./docs/srs.md),
 [`docs/api_contract.md`](./docs/api_contract.md) và các wireframe trong [`docs/wireframe/`](./docs/wireframe/).
 
+## Chạy nhanh bằng Docker (2 lệnh)
+
+Từ thư mục dự án, tạo cấu hình rồi khởi động API và PostgreSQL:
+
+```powershell
+cp .env.example .env
+docker compose up -d --build
+```
+
+Compose tự chạy migration, seed và tạo tài khoản demo. Hướng dẫn tiếng Anh, biến môi trường và kết
+quả cần đối chiếu xem tại [`docs/deployment-guide.md`](./docs/deployment-guide.md).
+
 ## 1. Yêu cầu môi trường
 
 - Node.js **20 trở lên** và npm đi kèm Node.js.
@@ -48,19 +60,19 @@ DB_NAME=smartcrm_l4_workshop
 DB_USER=postgres
 DB_PASSWORD=mat_khau_postgres_cua_ban
 
-APP_PORT=8000
+APP_PORT=3000
 AUTH_COOKIE_SECURE=false
 AUTH_BOOTSTRAP_USERNAME=manager
 AUTH_BOOTSTRAP_PASSWORD=mat_khau_rieng_it_nhat_12_ky_tu
 AUTH_BOOTSTRAP_DISPLAY_NAME=Quan ly trung tam
 
 VITE_API_BASE_URL=/api
-VITE_API_PROXY_TARGET=http://localhost:8000
+VITE_API_PROXY_TARGET=http://localhost:3000
 ```
 
 API nhận cấu hình DB qua `DATABASE_URL` nếu biến này được khai báo; nếu không, API dùng nhóm
 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Cổng API local là `APP_PORT` (hoặc `PORT`),
-mặc định `8000`. Frontend dùng `VITE_API_BASE_URL`; khi phát triển, Vite chuyển tiếp `/api` đến
+mặc định `3000`. Frontend dùng `VITE_API_BASE_URL`; khi phát triển, Vite chuyển tiếp `/api` đến
 `VITE_API_PROXY_TARGET`. `AUTH_COOKIE_SECURE` đặt `true` khi chạy qua HTTPS; để `false` khi chạy local
 qua HTTP. Mật khẩu bootstrap tối thiểu 12 ký tự; không dùng mật khẩu ví dụ ở trên làm mật khẩu thật.
 
@@ -88,11 +100,13 @@ npm run seed
   tránh tạo trùng dữ liệu.
 - Có thể kiểm tra tính lặp lại bằng cách chạy lại cả hai lệnh trên. Migration dùng checksum và bỏ
   qua tệp đã áp dụng; seed dùng `ON CONFLICT`/`NOT EXISTS` và transaction cho từng tệp.
+- Khi chạy `npm start`, ứng dụng tự áp dụng migration, seed và bootstrap user; các lệnh trên hữu ích
+  để kiểm tra hoặc khởi tạo database riêng trước khi chạy ứng dụng.
 
 ### 3.3 Tạo tài khoản đăng nhập ban đầu
 
 Đặt `AUTH_BOOTSTRAP_USERNAME`, `AUTH_BOOTSTRAP_PASSWORD` và `AUTH_BOOTSTRAP_DISPLAY_NAME` trong
-`.env`, sau đó tạo tài khoản:
+`.env`. `npm start` tự tạo/cập nhật tài khoản khi khởi động; có thể chạy lệnh sau riêng nếu cần:
 
 ```powershell
 npm run auth:bootstrap
@@ -109,14 +123,15 @@ Mở terminal thứ nhất ở thư mục gốc:
 npm start
 ```
 
-API mặc định chạy tại `http://localhost:8000`. Có thể xác nhận API và database:
+API mặc định chạy tại `http://localhost:3000`. Có thể xác nhận API và database:
 
 ```powershell
-curl.exe http://localhost:8000/health
-curl.exe http://localhost:8000/health/ready
+curl.exe http://localhost:3000/health
+curl.exe http://localhost:3000/health/ready
 ```
 
-`/health` kiểm tra tiến trình API; `/health/ready` kiểm tra khả năng kết nối PostgreSQL.
+`/health` trả `{"status":"ok","db":"up"}` khi API và PostgreSQL sẵn sàng.
+`/health/ready` là endpoint tương thích để kiểm tra khả năng kết nối PostgreSQL.
 
 ### 3.5 Khởi động giao diện
 
@@ -127,7 +142,7 @@ npm run dev
 ```
 
 Mở địa chỉ Vite được in ra trong terminal, thường là `http://localhost:5173`. Khi phát triển, trình
-duyệt gọi API qua Vite proxy; backend phải được chạy trước. Nếu backend không ở cổng 8000, cập nhật
+duyệt gọi API qua Vite proxy; backend phải được chạy trước. Nếu backend không ở cổng 3000, cập nhật
 `VITE_API_PROXY_TARGET` trong `.env` rồi khởi động lại Vite.
 
 Thanh menu đầu trang có ba mục điều hướng: **Phân công**, **Lịch hẹn** và **Công việc của tôi**.
@@ -149,57 +164,22 @@ hiển thị thống nhất theo `dd/MM/yyyy HH:mm`.
 - Backend và Vite: nhấn `Ctrl+C` trong từng terminal.
 - PostgreSQL cài trên máy: dừng dịch vụ bằng công cụ/Services của PostgreSQL, nếu muốn.
 
-## 4. Cách chạy PostgreSQL bằng Docker Compose
+## 4. Docker Compose
 
-Docker Compose khởi chạy PostgreSQL và API. Cần Docker Desktop hoạt động trước khi chạy lệnh.
+Hai lệnh nhanh ở đầu README tạo `.env` và khởi động hai dịch vụ. PostgreSQL không publish port ra
+host; API được publish ở cổng 3000. Compose đợi database healthy, chạy migration/seed lặp an toàn và
+tạo tài khoản demo trước khi API lắng nghe.
 
-1. Tạo/cập nhật `.env` như mục 2. Giá trị DB trong compose được đọc từ `DB_NAME`, `DB_USER`,
-   `DB_PASSWORD`; cổng host có thể đặt qua `DB_PORT` và `API_PORT`.
-2. Khởi động dịch vụ:
+Kiểm tra container và endpoint:
 
-   ```powershell
-   docker compose up --build -d
-   ```
+```powershell
+docker compose ps
+curl.exe http://localhost:3000/health
+```
 
-3. Xem trạng thái container và log:
-
-   ```powershell
-   docker compose ps
-   docker compose logs -f db api
-   ```
-
-4. Chờ database healthy, sau đó kiểm tra API:
-
-   ```powershell
-   curl.exe http://localhost:8000/health
-   curl.exe http://localhost:8000/health/ready
-   ```
-
-   `API_PORT` mặc định là `8000`; nếu đổi cổng, thay URL tương ứng.
-
-5. Để chạy giao diện khi backend ở Docker, mở terminal thứ hai và chạy Vite:
-
-   ```powershell
-   npm run dev
-   ```
-
-   Mặc định Vite proxy đến `http://localhost:8000`. Nếu đổi `API_PORT`, cập nhật
-   `VITE_API_PROXY_TARGET` trong `.env` cho đúng.
-
-6. Dừng container nhưng vẫn giữ dữ liệu PostgreSQL:
-
-   ```powershell
-   docker compose down
-   ```
-
-   PostgreSQL giữ dữ liệu trong volume `db_data`. Lệnh
-   `docker compose down -v` **xóa volume và toàn bộ dữ liệu trong volume đó**; chỉ dùng khi chủ động
-   muốn khởi tạo database Docker lại từ đầu.
-
-Khi Docker tạo volume database mới, PostgreSQL tự chạy các tệp init được mount từ `migrations/` và
-`seeds/`. Nếu volume đã có dữ liệu, init script không tự chạy lại.
-Nếu dùng volume được tạo trước migration xác thực, chạy `npm run migrate` từ host sau khi PostgreSQL
-Docker khởi động; sau đó cấu hình tài khoản trong `.env` và chạy `npm run auth:bootstrap`.
+Kết quả mong đợi là cả `app` và `db` healthy cùng JSON `{"status":"ok","db":"up"}`.
+Để giữ dữ liệu khi dừng, chạy `docker compose down`; chỉ dùng `docker compose down -v` khi chủ động
+xóa toàn bộ volume database để khởi tạo lại.
 
 ## 5. Nạp dataset Track SE–L4
 
@@ -241,7 +221,7 @@ npm run build
 ```
 
 Vite ghi bản build vào `dist/`. Khi thư mục build tồn tại, Express phục vụ giao diện ở
-`http://localhost:8000/`. Chạy `npm start` để mở API và bản build. Các lệnh `npm run dev` và
+`http://localhost:3000/`. Chạy `npm start` để mở API và bản build. Các lệnh `npm run dev` và
 `npm run build` cần dependency phát triển Vite từ `npm install`.
 
 ## 7. Kiểm thử
@@ -261,6 +241,8 @@ npm run test:l4
 
 Các test dùng fixture/fake cho repository và API nên không yêu cầu PostgreSQL đang chạy. Để xác minh
 toàn bộ luồng với dữ liệu thật, cần PostgreSQL đã cấu hình, sau đó chạy migration và seed trước.
+Kế hoạch và kết quả kiểm thử BT2 được ghi tại [`docs/test-plan.md`](./docs/test-plan.md) và
+[`docs/test-report.md`](./docs/test-report.md); các giới hạn kiểm chứng phải được đọc cùng báo cáo.
 
 ## 8. API chính
 

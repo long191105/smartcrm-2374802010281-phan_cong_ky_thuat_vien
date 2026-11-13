@@ -30,15 +30,15 @@ test('listTickets normalizes pagination and forwards supported filters', async (
     limit: 20,
     offset: 5,
   });
+});
 
-  test('listTickets rejects malformed exact ticket filters', async () => {
-    const service = new TicketService({ async list() { assert.fail('repository must not run'); } });
+test('listTickets rejects malformed exact ticket filters', async () => {
+  const service = new TicketService({ async list() { assert.fail('repository must not run'); } });
 
-    await assert.rejects(
-      () => service.listTickets({ ticket_code: 'not-a-ticket' }),
-      { statusCode: 422, code: 'VALIDATION_ERROR' },
-    );
-  });
+  await assert.rejects(
+    () => service.listTickets({ ticket_code: 'not-a-ticket' }),
+    { statusCode: 422, code: 'VALIDATION_ERROR' },
+  );
 });
 
 test('listTickets rejects statuses outside the dataset vocabulary', async () => {

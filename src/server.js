@@ -1,19 +1,28 @@
 require('dotenv').config();
 
 const { createApp } = require('./app');
+const { loadConfig } = require('./config');
+const { initializeDatabase } = require('./db/initialize');
 const { createPool } = require('./db/pool');
 
 function getPort(env = process.env) {
-  const port = Number(env.PORT || env.APP_PORT || 8000);
+  const port = Number(env.PORT || env.APP_PORT || 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error('PORT must be an integer between 1 and 65535');
+    throw new Error('APP_PORT must be an integer between 1 and 65535');
   }
   return port;
 }
 
-function startServer() {
-  const port = getPort();
-  const pool = createPool();
+async function startServer(env = process.env) {
+  const config = loadConfig(env);
+  const port = config.port || getPort(env);
+  const pool = createPool(env);
+  try {
+    await initializeDatabase(pool, env);
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
   const app = createApp({ pool });
   const server = app.listen(port, () => {
     console.log(`Smart CRM L4 API listening on port ${port}`);
@@ -58,12 +67,10 @@ function startServer() {
 }
 
 if (require.main === module) {
-  try {
-    startServer();
-  } catch (error) {
+  startServer().catch((error) => {
     console.error('Application startup failed:', error.message);
     process.exitCode = 1;
-  }
+  });
 }
 
 module.exports = { getPort, startServer };
